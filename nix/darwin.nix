@@ -116,6 +116,9 @@ in pkgs.stdenv.mkDerivation {
   '';
   buildPhase = ''
     runHook preBuild
+    # rustc takes its Mach-O minimum from this variable; the Nix SDK defaults it to a newer release than
+    # Chromium's mac_deployment_target (13.0), which makes ld64.lld reject the Rust host tools' objects.
+    export MACOSX_DEPLOYMENT_TARGET=13.0
     ninja -C out/Release -j$NIX_BUILD_CORES chrome
     runHook postBuild
   '';
