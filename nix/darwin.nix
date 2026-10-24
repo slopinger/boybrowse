@@ -126,6 +126,9 @@ in pkgs.stdenv.mkDerivation {
     # rustc takes its Mach-O minimum from this variable; the Nix SDK defaults it to a newer release than
     # Chromium's mac_deployment_target (13.0), which makes ld64.lld reject the Rust host tools' objects.
     export MACOSX_DEPLOYMENT_TARGET=13.0
+    # nixpkgs strips resolv.h and iconv.h from the SDK and propagates them as separate packages, whose
+    # include paths only reach nixpkgs' cc wrapper. Chromium's own clang finds them through CPATH.
+    export CPATH="${lib.getDev pkgs.darwin.libresolv}/include:${lib.getDev pkgs.libiconv}/include"
     ninja -C out/Release -j$NIX_BUILD_CORES chrome
     runHook postBuild
   '';
