@@ -36,7 +36,9 @@ jobs:
           for app in /Applications/Xcode*.app; do
             if [ "$app" != "$selected_xcode" ]; then sudo rm -rf "$app"; fi
           done
-          sudo rm -rf /Library/Developer/CoreSimulator /Users/runner/Library/Caches /Users/runner/Library/Developer/CoreSimulator
+          sudo rm -rf /Library/Developer/CoreSimulator /Users/runner/Library/Developer/CoreSimulator
+          # Runner services write into the user cache while it is removed; it is only best-effort space.
+          sudo rm -rf /Users/runner/Library/Caches || true
           df -h /
       - uses: DeterminateSystems/nix-installer-action@9383ce2bf08796b65508822f5982f49151badc4e
         with:
