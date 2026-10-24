@@ -43,7 +43,7 @@ mac_sdk_version = "{version}"
 mac_sdk_build_version = "nix"
 mac_sdk_official_version = mac_sdk_version
 mac_sdk_official_build_version = mac_sdk_build_version
-mac_bin_path = rebase_path("//third_party/llvm-build/Release+Asserts/bin", root_build_dir)
+mac_bin_path = rebase_path("//third_party/llvm-build/Release+Asserts/bin/", root_build_dir)
 # Xcode version guards describe SDK compatibility; all compilation uses the
 # fixed-output Chromium Clang toolchain and the Nix Apple SDK.
 xcode_version = "2660"

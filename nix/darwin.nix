@@ -65,6 +65,10 @@ in pkgs.stdenv.mkDerivation {
     mkdir -p third_party/llvm-build/Release+Asserts third_party/rust-toolchain
     tar -xf ${clangArchive} -C third_party/llvm-build/Release+Asserts
     tar -xf ${rustArchive} -C third_party/rust-toolchain
+    # mac_bin_path points here: Chromium looks up gperf and libtool next to the LLVM tools.
+    mkdir -p third_party/llvm-build/Release+Asserts/bin
+    ln -sf ${pkgs.gperf}/bin/gperf third_party/llvm-build/Release+Asserts/bin/gperf
+    ln -sf ${pkgs.cctools}/bin/libtool third_party/llvm-build/Release+Asserts/bin/libtool
     mkdir -p third_party/node/mac_arm64/node-darwin-arm64/bin
     ln -sf ${pkgs.nodejs}/bin/node third_party/node/mac_arm64/node-darwin-arm64/bin/node
     mkdir -p third_party/typescript/mac-arm64/src third_party/devtools-frontend/src/third_party/esbuild third_party/gperf/cipd/bin
