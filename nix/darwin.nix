@@ -12,6 +12,19 @@ let
     hash = "sha256-XbIf/UkJzoLAgy350esGsBsVpUF2tzQeOfcYH0tIPbw=";
   };
   python = pkgs.python3.withPackages (p: [ p.jinja2 p.markupsafe p.ply p.six p.setuptools p.packaging ]);
+  # Match the pinned DevTools npm dependency, as the Linux Chromium derivation does.
+  esbuild = pkgs.buildGoModule rec {
+    pname = "esbuild";
+    version = "0.28.2";
+    src = pkgs.fetchFromGitHub {
+      owner = "evanw";
+      repo = "esbuild";
+      tag = "v${version}";
+      hash = "sha256-I1u+9U5Oj/KzxSjCxwyitwSuDKimatkbC3R2OtaUsfM=";
+    };
+    vendorHash = "sha256-+BfxCyg0KkDQpHt/wycy/8CTG6YBA/VJvJFhhzUnSiQ=";
+    subPackages = [ "cmd/esbuild" ];
+  };
   sdk = pkgs.apple-sdk_26;
   gn = pkgs.gn.override sourceInfo.deps.gn;
   gclientArgs = "${nixpkgs}/pkgs/applications/networking/browsers/chromium/files/gclient_args.gni";
@@ -44,6 +57,12 @@ in pkgs.stdenv.mkDerivation {
     tar -xf ${rustArchive} -C third_party/rust-toolchain
     mkdir -p third_party/node/mac_arm64/bin
     ln -sf ${pkgs.nodejs}/bin/node third_party/node/mac_arm64/bin/node
+    mkdir -p third_party/typescript/mac-arm64/src third_party/devtools-frontend/src/third_party/esbuild third_party/gperf/cipd/bin
+    cp -R ${pkgs.typescript}/lib/typescript third_party/typescript/mac-arm64/src/lib
+    chmod -R u+w third_party/typescript/mac-arm64/src/lib
+    patch --strip=1 --directory=third_party/typescript/mac-arm64/src --input=../3pp/patches/typescript_native_preview.patch
+    ln -sf ${esbuild}/bin/esbuild third_party/devtools-frontend/src/third_party/esbuild/esbuild
+    ln -sf ${pkgs.gperf}/bin/gperf third_party/gperf/cipd/bin/gperf
     export BOYBROWSE_SDK="${sdk}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
     export BOYBROWSE_SDK_VERSION="${sdk.version}"
     python3 ${../tools/prepare-darwin.py} ${builtins.toFile "chromium-info.json" (builtins.toJSON sourceInfo)}
@@ -54,7 +73,7 @@ in pkgs.stdenv.mkDerivation {
   configurePhase = ''
     runHook preConfigure
     export RUSTC_BOOTSTRAP=1
-    gn gen out/Release --args='is_debug=false is_official_build=false is_component_build=false symbol_level=0 blink_symbol_level=0 v8_symbol_level=0 target_cpu="arm64" target_os="mac" use_system_xcode=false is_chrome_branded=false chrome_pgo_phase=0 use_remoteexec=false use_siso=false enable_nacl=false enable_widevine=false treat_warnings_as_errors=false use_lld=true'
+    gn gen out/Release --args='is_debug=false is_official_build=false is_component_build=false symbol_level=0 blink_symbol_level=0 v8_symbol_level=0 target_cpu="arm64" target_os="mac" use_system_xcode=false is_chrome_branded=false chrome_pgo_phase=0 use_remoteexec=false use_siso=false enable_nacl=false enable_widevine=false use_typescript_go=false devtools_use_typescript_go=false treat_warnings_as_errors=false use_lld=true'
     runHook postConfigure
   '';
   buildPhase = ''

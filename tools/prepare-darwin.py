@@ -8,6 +8,12 @@ import sys
 root = pathlib.Path.cwd()
 info = json.loads(pathlib.Path(sys.argv[1]).read_text())
 revision = info["DEPS"]["src"]["rev"]
+dotfile = root / ".gn"
+contents = dotfile.read_text()
+python_context = 'script_executable = "//third_party/cpython3/host/bin/python3"'
+if contents.count(python_context) != 1:
+    raise RuntimeError("Chromium Python launcher context changed")
+dotfile.write_text(contents.replace(python_context, f'script_executable = "{sys.executable}"'))
 (root / "build/util/LASTCHANGE").write_text(f"LASTCHANGE={revision}-refs/tags/{info['version']}@{{#0}}\n")
 (root / "build/util/LASTCHANGE.committime").write_text(os.environ.get("SOURCE_DATE_EPOCH", "1") + "\n")
 for path, macro, rev in [

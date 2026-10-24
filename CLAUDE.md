@@ -51,6 +51,9 @@ Linux architectures: x86_64 and aarch64. macOS target: aarch64. No Windows build
 - nix/server-test.nix boots the NixOS service and verifies loopback binding, restart,
   private state directories and the daily backup timer. Backups retain 30 days in
   /var/lib/boybrowse-sync-backups (same disk).
+- Darwin reuses common fixed-source DEPS, with Nix-native Python, Node, TypeScript,
+  gperf and a version-matched esbuild (0.28.2). Keep upstream SDK argument declarations
+  while replacing host SDK discovery. Never execute Linux CIPD helpers on macOS.
 - Darwin HTTP tests require __darwinAllowLocalNetworking; this allows only local
   test sockets rather than disabling the Nix sandbox.
 - Deploy the Perl server only through nixfiles after its tests pass; bind 127.0.0.1:8792.

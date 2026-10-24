@@ -37,6 +37,7 @@ class PatchTools(unittest.TestCase):
             root = Path(directory)
             for path in ("build/util", "build/config/mac", "gpu/config", "skia/ext", "gpu/webgpu"):
                 (root / path).mkdir(parents=True, exist_ok=True)
+            (root / ".gn").write_text('script_executable = "//third_party/cpython3/host/bin/python3"\n')
             (root / "build/config/gclient_args.gni").write_text("checkout_mac = true\n")
             sdk = root / "build/config/mac/mac_sdk.gni"
             sdk.write_text('''import("//build_overrides/build.gni")
@@ -64,6 +65,8 @@ host_sdk = exec_script("find_sdk.py", [], "scope")
             self.assertIn('mac_min_system_version = "13.0"',text)
             self.assertIn('mac_sdk_path = "/nix/store/test-sdk"',text)
             self.assertNotIn("exec_script",text)
+            self.assertIn(sys.executable,(root / ".gn").read_text())
+            self.assertNotIn("third_party/cpython3",(root / ".gn").read_text())
             self.assertIn(overlay.REVISION,(root / "build/util/LASTCHANGE").read_text())
 
     def test_every_python_tool_parses(self):
