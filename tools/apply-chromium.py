@@ -2,6 +2,7 @@
 """Apply an exact, reviewable source overlay. Fail when upstream context changes."""
 import json
 import pathlib
+import re
 import shutil
 import sys
 
@@ -14,6 +15,14 @@ def replace(root, path, before, after):
     if source.count(before) != 1:
         raise RuntimeError(f"{path}: expected exactly one patch context: {before[:80]!r}")
     file.write_text(source.replace(before, after))
+
+def brand_strings(source):
+    def message(match):
+        opening, body, closing = match.groups()
+        if "Chromium Authors" in body or "COPYRIGHT" in opening:
+            return match.group(0)
+        return opening + re.sub(r"\bChromium\b", "Boybrowse", body) + closing
+    return re.sub(r"(<message\b[^>]*>)(.*?)(</message>)", message, source, flags=re.DOTALL)
 
 def apply(root, overlay):
     version = dict(line.split("=", 1) for line in (root / "chrome/VERSION").read_text().splitlines())
@@ -90,9 +99,10 @@ def apply(root, overlay):
     brand = brand.replace("PRODUCT_INSTALLER_SHORTNAME=Chromium", "PRODUCT_INSTALLER_SHORTNAME=Boybrowse")
     brand = brand.replace("MAC_BUNDLE_ID=org.chromium.Chromium", "MAC_BUNDLE_ID=net.freifick.boybrowse")
     branding.write_text(brand)
-    # Retain attribution and translations; replace the unbranded product name.
+    # Grit message bodies contain whitespace and nested placeholders. Preserve
+    # source structure, identifiers, URLs and upstream author attribution.
     strings = root / "chrome/app/chromium_strings.grd"
-    strings.write_text(strings.read_text().replace(">Chromium<", ">Boybrowse<"))
+    strings.write_text(brand_strings(strings.read_text()))
     colors = """
   // Boybrowse native browser surfaces; forced colors below take precedence.
   mixer[ui::kColorFrameActive] = {SkColorSetRGB(0x36, 0x2b, 0x43)};
