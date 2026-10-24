@@ -88,12 +88,18 @@
         '';
         dontFixup = true;
       });
-    in { inherit pkgs perl server browser nativeCheck; };
+      upstreamCheck = pkgs.writeShellApplication {
+        name = "boybrowse-upstream-check";
+        runtimeInputs = [ pkgs.python3 ];
+        text = "exec python3 ${./tools/check-upstream.py} ${sourceInfo.version}";
+      };
+    in { inherit pkgs perl server browser nativeCheck upstreamCheck; };
   in {
     packages = each (system: let p = mk system; in {
       default = p.browser;
       boybrowse = p.browser;
       boybrowse-sync = p.server;
+      upstream-check = p.upstreamCheck;
     } // nixpkgs.lib.optionalAttrs (system != "aarch64-darwin") { native-check = p.nativeCheck; });
     checks = each (system: let p = mk system; in ({
       server = p.server;
