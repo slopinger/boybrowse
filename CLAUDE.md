@@ -36,6 +36,11 @@ Linux architectures: x86_64 and aarch64. macOS target: aarch64. No Windows build
   dashboard previews only verify page layout and frontend interactions.
 - Hydra CI belongs on hydra.kyouma.net, project boybrowse, flake jobset main, managed
   through hydra-mcp. GitHub Actions owns macOS; it invokes Nix for every build/check.
+- nix/server-test.nix boots the NixOS service and verifies loopback binding, restart,
+  private state directories and the daily backup timer. Backups retain 30 days in
+  /var/lib/boybrowse-sync-backups (same disk).
+- Darwin HTTP tests require __darwinAllowLocalNetworking; this allows only local
+  test sockets rather than disabling the Nix sandbox.
 - Deploy the Perl server only through nixfiles after its tests pass; bind 127.0.0.1:8792.
   Intended domain boybrowse-sync.freifick.net; state /var/lib/boybrowse-sync/state.sqlite3.
   Keep README's deployment/build status accurate rather than claiming pending checks passed.

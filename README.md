@@ -38,7 +38,7 @@ nix develop                      # pinned Perl, Node, Python, git
 ```
 
 Supported build targets: `x86_64-linux`, `aarch64-linux`, `aarch64-darwin`.
-macOS is built by Nix on GitHub Actions; the SDK and Chromium toolchain archives
+macOS builds run through Nix on GitHub Actions; the SDK and Chromium toolchain archives
 are pinned inputs. Windows builds are excluded. Chromium's extensive source
 dependencies are fixed-output inputs; compilation has no network access.
 
@@ -52,7 +52,8 @@ time. Do not mistake cached upstream Chromium for a completed Boybrowse build.
 |---|---|
 | Perl API/storage tests | 115 assertions pass in the Nix sandbox |
 | JavaScript model/crypto/sync tests | 8 tests pass in the Nix sandbox |
-| Real Perl HTTP integration | Pass: two clients, conflicts, isolation, revocation, recovery, backup |
+| Real Perl HTTP integration | Pass locally and on Hydra for both Linux architectures |
+| NixOS service VM | Pass: service boot/restart, loopback listener, backup timer and private state directories |
 | Dashboard layout | Desktop preview visually inspected; native runtime validation pending |
 | Linux source browser | Build in progress; no working binary claimed |
 | Linux ARM64 browser | Hydra build pending |
@@ -88,7 +89,7 @@ cloud AI, or automatic diagnostics upload.
 ### Server deployment
 
 The flake exports `nixosModules.default` with `services.boybrowse-sync.enable`,
-`package`, and `port` options. The daemon binds loopback only. Configure Caddy
+`package`, `port`, and `backups.enable` options. The daemon binds loopback only. Configure Caddy
 and DNS through your host's NixOS flake.
 
 Planned local deployment: `https://boybrowse-sync.freifick.net`, loopback port 8792,
@@ -101,7 +102,8 @@ BOYBROWSE_DB=/path/to/state.sqlite3 boybrowse-syncctl invite
 BOYBROWSE_DB=/path/to/state.sqlite3 boybrowse-syncctl backup /private/backup.sqlite3
 ```
 
-`backup` uses SQLite's online backup API and verifies the result. Tests restore a
+`backups.enable` schedules daily verified copies in `/var/lib/boybrowse-sync-backups`,
+retained for 30 days on the same disk. `backup` uses SQLite's online backup API and verifies the result. Tests restore a
 copy and verify authorization and integrity. Never copy a live SQLite database
 without accounting for its WAL.
 

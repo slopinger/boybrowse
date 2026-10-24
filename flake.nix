@@ -14,6 +14,7 @@
         src = ./server;
         nativeBuildInputs = [ pkgs.makeWrapper ];
         nativeCheckInputs = [ perl ];
+        __darwinAllowLocalNetworking = true;
         dontBuild = true;
         doCheck = true;
         checkPhase = "prove -Ilib -v t";
@@ -67,14 +68,26 @@
         meta = old.meta // { mainProgram = "boybrowse"; description = "Boybrowse Chromium source fork"; };
         passthru = old.passthru // { inherit native; };
       });
-    in { inherit pkgs perl server browser; };
+      nativeCheck = native.overrideAttrs (old: {
+        name = "boybrowse-native-compile-check";
+        outputs = [ "out" ];
+        buildPhase = ''
+          ninja -C out/Release -j$NIX_BUILD_CORES obj/chrome/browser/ui/webui/boybrowse/boybrowse/boybrowse_ui.o
+        '';
+        installPhase = ''
+          mkdir -p $out
+          cp out/Release/obj/chrome/browser/ui/webui/boybrowse/boybrowse/boybrowse_ui.o $out/
+        '';
+        dontFixup = true;
+      });
+    in { inherit pkgs perl server browser nativeCheck; };
   in {
     packages = each (system: let p = mk system; in {
       default = p.browser;
       boybrowse = p.browser;
       boybrowse-sync = p.server;
-    });
-    checks = each (system: let p = mk system; in {
+    } // nixpkgs.lib.optionalAttrs (system != "aarch64-darwin") { native-check = p.nativeCheck; });
+    checks = each (system: let p = mk system; in ({
       server = p.server;
       browser = p.browser;
       runtime = p.pkgs.runCommand "boybrowse-native-smoke" { nativeBuildInputs = [ p.pkgs.coreutils ]; } ''
@@ -90,7 +103,7 @@
         grep -q 'data-decoration="full"' $out/dashboard.html
         grep -q 'Brain scraps' $out/dashboard.html
       '';
-      integration = p.pkgs.runCommand "boybrowse-sync-integration" { nativeBuildInputs = [ p.pkgs.nodejs ]; } ''
+      integration = p.pkgs.runCommand "boybrowse-sync-integration" { nativeBuildInputs = [ p.pkgs.nodejs ]; __darwinAllowLocalNetworking = true; } ''
         node ${self}/tests/integration.mjs ${p.server}
         touch $out
       '';
@@ -99,9 +112,13 @@
         node --test tests/*.test.mjs
         touch $out
       '';
+    }) // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
+      nixos = import ./nix/server-test.nix { inherit self; pkgs = p.pkgs; };
     });
-    hydraJobs = nixpkgs.lib.genAttrs [ "browser" "server" "javascript" "integration" ]
-      (name: nixpkgs.lib.genAttrs linuxSystems (system: self.checks.${system}.${name}));
+    hydraJobs = (nixpkgs.lib.genAttrs [ "browser" "server" "javascript" "integration" ]
+      (name: nixpkgs.lib.genAttrs linuxSystems (system: self.checks.${system}.${name}))) // {
+        nixos.x86_64-linux = self.checks.x86_64-linux.nixos;
+      };
     devShells = each (system: let p = mk system; in {
       default = p.pkgs.mkShell { packages = [ p.perl p.pkgs.nodejs p.pkgs.python3 p.pkgs.git ]; };
     });
