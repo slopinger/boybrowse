@@ -18,7 +18,7 @@ let
 in pkgs.stdenv.mkDerivation {
   pname = "boybrowse";
   version = sourceInfo.version;
-  nativeBuildInputs = [ python pkgs.nodejs pkgs.ninja gn pkgs.pkg-config pkgs.bison pkgs.gperf pkgs.nasm pkgs.perl pkgs.go pkgs.xz pkgs.zstd pkgs.npmHooks.npmConfigHook ];
+  nativeBuildInputs = [ python pkgs.nodejs pkgs.ninja gn pkgs.pkg-config pkgs.bison pkgs.gperf pkgs.nasm pkgs.perl pkgs.go pkgs.xz pkgs.zstd pkgs.librsvg pkgs.npmHooks.npmConfigHook ];
   buildInputs = [ sdk ];
   npmDeps = upstream.npmDeps;
   npmRoot = "third_party/node";
@@ -48,6 +48,7 @@ in pkgs.stdenv.mkDerivation {
     export BOYBROWSE_SDK_VERSION="${sdk.version}"
     python3 ${../tools/prepare-darwin.py} ${builtins.toFile "chromium-info.json" (builtins.toJSON sourceInfo)}
     python3 ${../tools/apply-chromium.py} . ${overlay}/browser
+    python3 ${../tools/brand-icons.py} . ${overlay}/browser/ui/icon.svg
     patchShebangs build tools third_party
   '';
   configurePhase = ''

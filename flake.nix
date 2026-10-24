@@ -36,9 +36,10 @@
       sourceInfo = (builtins.fromJSON (builtins.readFile "${nixpkgs}/pkgs/applications/networking/browsers/chromium/info.json")).chromium;
       native = pkgs.chromium.browser.overrideAttrs (old: {
         name = "boybrowse-browser";
-        nativeBuildInputs = old.nativeBuildInputs ++ [ pkgs.python3 ];
+        nativeBuildInputs = old.nativeBuildInputs ++ [ pkgs.python3 pkgs.librsvg ];
         postPatch = (old.postPatch or "") + ''
           ${pkgs.python3}/bin/python3 ${./tools/apply-chromium.py} . ${overlay}/browser
+          ${pkgs.python3}/bin/python3 ${./tools/brand-icons.py} . ${overlay}/browser/ui/icon.svg
         '';
         installPhase = old.installPhase +  ''
           cp -r ${./blocker} $out/libexec/chromium/resources/boybrowse_blocker
@@ -62,8 +63,15 @@
             chmod -R u+w $out/share/applications
             substituteInPlace $out/share/applications/chromium-browser.desktop \
               --replace-fail "Name=Chromium" "Name=Boybrowse" \
-              --replace-fail "Exec=chromium" "Exec=boybrowse"
+              --replace-fail "Exec=chromium" "Exec=boybrowse" \
+              --replace-fail "Icon=chromium" "Icon=boybrowse"
             mv $out/share/applications/chromium-browser.desktop $out/share/applications/boybrowse.desktop
+            rm $out/share/icons
+            cp -r ${native}/share/icons $out/share/icons
+            chmod -R u+w $out/share/icons
+            for icon in $out/share/icons/hicolor/*/apps/chromium.png; do
+              mv "$icon" "$(dirname "$icon")/boybrowse.png"
+            done
           '';
         meta = old.meta // { mainProgram = "boybrowse"; description = "Boybrowse Chromium source fork"; };
         passthru = old.passthru // { inherit native; };
