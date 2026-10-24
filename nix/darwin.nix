@@ -36,6 +36,8 @@ in pkgs.stdenv.mkDerivation {
   npmDeps = upstream.npmDeps;
   npmRoot = "third_party/node";
   patches = [
+    # Chromium pins an exact Node release; nixpkgs patches the check to a minimum version.
+    "${nixpkgs}/pkgs/applications/networking/browsers/chromium/patches/chromium-136-nodejs-assert-minimal-version-instead-of-exact-match.patch"
     # CL 7457194 references CIPD-only finch seeds that source tarballs lack; nixpkgs reverts it on Linux too.
     (pkgs.fetchpatch {
       name = "chromium-146-revert-Add-finch-seeds-to-desktop-perf-builds.patch";
