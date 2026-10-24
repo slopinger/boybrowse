@@ -48,6 +48,13 @@ class PatchTools(unittest.TestCase):
   ]
 }
 ''')
+            metal_dir = root / "third_party/angle/src/libANGLE/renderer/metal"
+            metal_dir.mkdir(parents=True)
+            metal_gni = metal_dir / "metal_backend.gni"
+            metal_gni.write_text('''metal_internal_shader_compilation_supported =
+    angle_has_build &&
+    (angle_metal_toolchain_dir != "" || (!is_ios && target_os == host_os))
+''')
             sdk = root / "build/config/mac/mac_sdk.gni"
             sdk.write_text('''import("//build_overrides/build.gni")
 declare_args() {
@@ -79,6 +86,7 @@ host_sdk = exec_script("find_sdk.py", [], "scope")
             self.assertIn(overlay.REVISION,(root / "build/util/LASTCHANGE").read_text())
             self.assertNotIn("gpu_shader_cache.bin",chrome_build.read_text())
             self.assertIn("product_logo_32.png",chrome_build.read_text())
+            self.assertEqual("metal_internal_shader_compilation_supported = false\n",metal_gni.read_text())
 
     def test_every_python_tool_parses(self):
         for path in (ROOT / "tools").glob("*.py"):

@@ -59,3 +59,15 @@ contents = chrome_build.read_text()
 if contents.count(bundled) != 1:
     raise RuntimeError("Chromium Metal shader cache bundle context changed")
 chrome_build.write_text(contents.replace(bundled, ""))
+# ANGLE precompiles its internal Metal shaders with Apple's `metal` tool, which Xcode 26 ships as a
+# separate downloadable toolchain that the Nix SDK lacks. ANGLE's supported alternative is compiling the
+# embedded shader sources when the backend starts, so disable the build-time step.
+metal_gni = root / "third_party/angle/src/libANGLE/renderer/metal/metal_backend.gni"
+supported = '''metal_internal_shader_compilation_supported =
+    angle_has_build &&
+    (angle_metal_toolchain_dir != "" || (!is_ios && target_os == host_os))
+'''
+contents = metal_gni.read_text()
+if contents.count(supported) != 1:
+    raise RuntimeError("ANGLE Metal shader compilation context changed")
+metal_gni.write_text(contents.replace(supported, "metal_internal_shader_compilation_supported = false\n"))
