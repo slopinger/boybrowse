@@ -65,8 +65,8 @@ in pkgs.stdenv.mkDerivation {
     mkdir -p third_party/llvm-build/Release+Asserts third_party/rust-toolchain
     tar -xf ${clangArchive} -C third_party/llvm-build/Release+Asserts
     tar -xf ${rustArchive} -C third_party/rust-toolchain
-    mkdir -p third_party/node/mac_arm64/bin
-    ln -sf ${pkgs.nodejs}/bin/node third_party/node/mac_arm64/bin/node
+    mkdir -p third_party/node/mac_arm64/node-darwin-arm64/bin
+    ln -sf ${pkgs.nodejs}/bin/node third_party/node/mac_arm64/node-darwin-arm64/bin/node
     mkdir -p third_party/typescript/mac-arm64/src third_party/devtools-frontend/src/third_party/esbuild third_party/gperf/cipd/bin
     cp -R ${pkgs.typescript}/lib/typescript third_party/typescript/mac-arm64/src/lib
     chmod -R u+w third_party/typescript/mac-arm64/src/lib
