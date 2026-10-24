@@ -84,8 +84,9 @@ in pkgs.stdenv.mkDerivation {
     runHook preConfigure
     export RUSTC_BOOTSTRAP=1
     # A silent GN hang once burned two hours of macOS CI. GN's piped output is block-buffered and lost
-    # when killed, so on a stall report the process tree and a stack sample, then fail.
-    gn gen --time out/Release --args='is_debug=false is_official_build=false is_component_build=false symbol_level=0 blink_symbol_level=0 v8_symbol_level=0 target_cpu="arm64" target_os="mac" use_system_xcode=false is_chrome_branded=false chrome_pgo_phase=0 use_remoteexec=false use_siso=false enable_nacl=false enable_widevine=false use_typescript_go=false devtools_use_typescript_go=false treat_warnings_as_errors=false use_lld=true' &
+    # when it is killed, so run it on a pty (line-buffered, streams into the log) and, on a stall,
+    # report the process tree and a stack sample before failing.
+    python3 -c 'import pty, sys; sys.exit(pty.spawn(sys.argv[1:]) >> 8)' gn gen --verbose --time out/Release --args='is_debug=false is_official_build=false is_component_build=false symbol_level=0 blink_symbol_level=0 v8_symbol_level=0 target_cpu="arm64" target_os="mac" use_system_xcode=false is_chrome_branded=false chrome_pgo_phase=0 use_remoteexec=false use_siso=false enable_nacl=false enable_widevine=false use_typescript_go=false devtools_use_typescript_go=false treat_warnings_as_errors=false use_lld=true' &
     gn_pid=$!
     for _ in $(seq 90); do
       sleep 10
@@ -93,8 +94,8 @@ in pkgs.stdenv.mkDerivation {
     done
     if kill -0 $gn_pid 2>/dev/null; then
       echo "gn gen stalled after 15 minutes; process tree:"
-      ps -axo pid,ppid,etime,command | grep -v grep | grep -E "gn|python|node|rustc|clang" || true
-      /usr/bin/sample $gn_pid 5 -file gn-sample.txt >/dev/null 2>&1 || true
+      /bin/ps -axo pid,ppid,etime,command 2>&1 | grep -v grep | grep -E "gn|python|node|rustc|clang|PID" || true
+      /usr/bin/sample gn 5 -file gn-sample.txt 2>&1 | tail -3 || true
       head -80 gn-sample.txt 2>/dev/null || true
       kill -9 $gn_pid
       exit 1
