@@ -88,12 +88,12 @@ in pkgs.stdenv.mkDerivation {
     # report the process tree and a stack sample before failing.
     python3 -c 'import pty, sys; sys.exit(pty.spawn(sys.argv[1:]) >> 8)' gn gen --verbose --time out/Release --args='is_debug=false is_official_build=false is_component_build=false symbol_level=0 blink_symbol_level=0 v8_symbol_level=0 target_cpu="arm64" target_os="mac" use_system_xcode=false is_chrome_branded=false chrome_pgo_phase=0 use_remoteexec=false use_siso=false enable_nacl=false enable_widevine=false use_typescript_go=false devtools_use_typescript_go=false treat_warnings_as_errors=false use_lld=true' &
     gn_pid=$!
-    for _ in $(seq 90); do
+    for _ in $(seq 30); do
       sleep 10
       kill -0 $gn_pid 2>/dev/null || break
     done
     if kill -0 $gn_pid 2>/dev/null; then
-      echo "gn gen stalled after 15 minutes; process tree:"
+      echo "gn gen stalled after 5 minutes; process tree:"
       /bin/ps -axo pid,ppid,etime,command 2>&1 | grep -v grep | grep -E "gn|python|node|rustc|clang|PID" || true
       /usr/bin/sample gn 5 -file gn-sample.txt 2>&1 | tail -3 || true
       head -80 gn-sample.txt 2>/dev/null || true
