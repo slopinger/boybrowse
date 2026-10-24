@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Boybrowse Shields",
+  "version": "0.1.0",
+  "description": "Boybrowse third-party advertising and tracker request filtering.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAilrFTYwQTssDfCwJmp3DBR0MiKC4iqToB5hzjukt2E2+TESemjjFNXG77JY95/vOMZS100cLNlmytyR2bisuByFuAEbh8ME2nxTnvoWYjOKOEER8vUNiGX4wv1iRWrTcS4OCGob6rK3uxbNASgWUCGNWXOugqQYPKPTOyl2ZllDXZ7a73teWMczHFnNO4WZv8DbcRF0l7e2ZTTQRFl3otPuUc5fgnpArwSfTzODxtAil5jf6a75pBHdkwD+cKlWhAjKmTbIG76Bx+gwbGgKqSy+fyv6mVJw8YD3jCEF4hJQzmvlOB897C+AMA6wNrZLJXKqyi7qXYo+2DPsM3JT5EwIDAQAB",
+  "permissions": [
+    "declarativeNetRequest",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "options_page": "options.html",
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "starter",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  }
+}

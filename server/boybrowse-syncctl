@@ -1,0 +1,27 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use FindBin;
+use lib "$FindBin::Bin/lib";
+use Boybrowse::Store;
+use DBI;
+umask 0077;
+my $store = Boybrowse::Store->new($ENV{BOYBROWSE_DB} // 'boybrowse.sqlite3');
+my $command = shift // '';
+if ($command eq 'invite') {
+  print $store->invite(undef, 86400), "\n";
+} elsif ($command eq 'accounts') {
+  for (@{$store->db->selectall_arrayref('SELECT id,revision FROM accounts', {Slice => {}})}) {
+    print "$_->{id} revision=$_->{revision}\n";
+  }
+} elsif ($command eq 'backup') {
+  my $path = shift // die "backup requires a destination\n";
+  die "destination already exists\n" if -e $path;
+  $store->db->sqlite_backup_to_file($path);
+  chmod 0600, $path;
+  my $copy = DBI->connect("dbi:SQLite:dbname=$path", '', '', {RaiseError => 1});
+  die "backup integrity failed\n" unless $copy->selectrow_array('PRAGMA integrity_check') eq 'ok';
+  print "Backup verified\n";
+} else {
+  die "Usage: BOYBROWSE_DB=/path/to/state.sqlite3 boybrowse-syncctl invite|accounts|backup DEST\n";
+}

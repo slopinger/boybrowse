@@ -1,0 +1,7 @@
+/result*
+/.build/
+/node_modules/
+/test-results/
+*.sqlite3*
+*.db*
+.env

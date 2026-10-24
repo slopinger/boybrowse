@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Boybrowse — make yourself at home</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<div class="shell">
+<aside class="rail" aria-label="Boybrowse">
+<a class="wordmark" href="#home"><span class="mark" aria-hidden="true">b.</span> boybrowse<span class="star">✶</span></a>
+<div class="edition">PERSONAL INTERNET DEPARTMENT<br>she/her · preview 0.1</div>
+<button class="command-launch" id="palette-open">Find a tab or do a thing <kbd>⌘/Ctrl K</kbd></button>
+<nav aria-label="Your browser">
+<button data-view="home" class="nav active"><span>✳</span> Your little corner</button>
+<button data-view="tabs" class="nav"><span>▤</span> Tab hoard <span id="tab-count" class="count">—</span></button>
+<button data-view="workspaces" class="nav"><span>▦</span> Workspaces</button>
+<button data-view="notes" class="nav"><span>✎</span> Brain scraps</button>
+<button data-view="bookmarks" class="nav"><span>♡</span> Bookmarks</button>
+<button data-view="sync" class="nav"><span>↔</span> Your other computers</button>
+<button data-view="privacy" class="nav"><span>◈</span> Privacy & appearance</button>
+</nav>
+<div class="rail-bottom">
+<div class="hoodie" aria-hidden="true"><img src="mascot.svg" alt=""><span class="sticker">currently<br>slopping</span></div>
+<button id="private-window" class="private">◌ Temporary window</button>
+<p class="tiny">a browser with too many tabs<br>and a very large hoodie.</p>
+</div>
+</aside>
+<main id="main" tabindex="-1">
+<header class="topline"><span id="location-label">YOUR LITTLE CORNER / HOME</span><span class="local-badge" id="sync-status">● on this computer</span></header>
+<section id="home" class="view">
+<div class="hero">
+<div class="eyebrow"><span class="live-dot"></span> THE WEB IS STILL YOURS. GET WEIRD WITH IT.</div>
+<h1>The internet,<br><em>slightly sloppier.</em><span class="orbit" aria-hidden="true">✧</span></h1>
+<p>A small corner of a very big web. Unzip the hoodie.<br>Open another tab. Make yourself at home.</p>
+<form id="search" class="search-box"><span aria-hidden="true">↗</span><label class="sr-only" for="address">Search or enter an address</label><input id="address" autocomplete="off" placeholder="where are we going?" required><button aria-label="Open address or search">let’s go ↗</button></form>
+<div class="search-caption"><span>DuckDuckGo search · no start-page tracking</span><span>⌘/Ctrl K to teleport</span></div>
+<div class="tape" aria-hidden="true">CERTIFIED TAB ACCUMULATOR ✶</div>
+</div>
+<div class="quick-links">
+<button data-url="https://freifick.net"><span class="quick-icon pink">⌂</span><span>slop’s room<small>freifick.net</small></span><b>↗</b></button>
+<button data-url="https://fedi.freifick.net"><span class="quick-icon purple">✳</span><span>the fediverse<small>fedi.freifick.net</small></span><b>↗</b></button>
+<button data-url="https://slopbox.freifick.net"><span class="quick-icon blue">↥</span><span>throw a file<small>slopbox.freifick.net</small></span><b>↗</b></button>
+<button data-url="https://github.com/slopinger"><span class="quick-icon yellow">{ }</span><span>the source of it all<small>github.com/slopinger</small></span><b>↗</b></button>
+</div>
+<div class="home-grid"><article class="card lavender"><div class="card-label">01 / A LITTLE LESS CHAOS</div><h2>Same brain.<br>Different workspaces.</h2><p>Save a collection of tabs for later. Your next rabbit hole can have its own room.</p><button id="save-workspace">Save this window ↗</button><div class="paper-tabs" aria-hidden="true"><span>servers</span><span>important!!</span><span>one more thing…</span></div></article>
+<article class="card pink-card"><div class="card-label">02 / UNLOAD A THOUGHT</div><h2>Brain full?<br>Put it here.</h2><p>Local notes for links, ideas, and whatever you opened that tab to remember.</p><button id="new-note">Write a brain scrap ↗</button><span class="doodle" aria-hidden="true">✎</span></article></div>
+<footer><span>BUILT FROM CHROMIUM. COVERED IN LAVENDER.</span><span>stay curious. stay slop.</span></footer>
+</section>
+<section id="tabs" class="view" hidden><div class="section-heading"><div><span class="eyebrow">THE COLLECTION</span><h1>Your tab hoard.</h1></div><button data-command="vertical">Toggle vertical tabs</button></div><p class="intro">Real tabs in this window. Drag to reorder, pin your favorites, or bring one back into focus.</p><div class="toolbar"><button data-command="restore">↶ Reopen closed tab</button><button id="split-tabs">◫ Split selected tabs</button><button id="refresh-tabs">↻ Refresh</button></div><div id="tab-list" class="list"></div></section>
+<section id="workspaces" class="view" hidden><div class="section-heading"><div><span class="eyebrow">ROOMS FOR YOUR RABBIT HOLES</span><h1>Workspaces.</h1></div><button id="workspace-create">+ Save this window</button></div><p class="intro">Named, persistent tab collections. Opening a workspace adds its pages; your current work stays open.</p><div id="workspace-list" class="collection"></div></section>
+<section id="notes" class="view" hidden><div class="section-heading"><div><span class="eyebrow">NO THOUGHT LEFT BEHIND</span><h1>Brain scraps.</h1></div><button id="note-create">+ New scrap</button></div><div class="notes-layout"><div id="note-list" class="list"></div><div id="note-editor" class="card editor" hidden><label for="note-title">Title</label><input id="note-title" maxlength="160"><label for="note-text">Your note · Markdown source</label><textarea id="note-text" rows="16" maxlength="100000" placeholder="no need to make it make sense yet."></textarea><div class="toolbar"><span id="note-saved" class="tiny">Saved on this computer</span><button id="note-delete">Delete scrap</button></div></div></div></section>
+<section id="bookmarks" class="view" hidden><div class="section-heading"><div><span class="eyebrow">KEEP THE GOOD PARTS</span><h1>Bookmarks.</h1></div><button data-internal="bookmarks">Open bookmark manager ↗</button></div><p class="intro">Your Chromium bookmarks, stored in your Boybrowse profile.</p><div id="bookmark-list" class="list"></div></section>
+<section id="sync" class="view" hidden><span class="eyebrow">SAME SLOP. DIFFERENT COMPUTER.</span><h1>Carry your corner.</h1><p class="intro">Optional, invite-only sync. Your browser encrypts your data before the Perl server receives it. Keep your recovery kit somewhere safe.</p>
+<div class="card sync-card"><form id="enroll-form"><h2>Connect this device</h2><label for="server">Your sync server</label><input type="url" id="server" value="https://boybrowse-sync.freifick.net" required><label for="device-name">Device name</label><input id="device-name" value="My computer" maxlength="80" required><label for="invitation">Invitation token</label><input id="invitation" autocomplete="off" type="password" required><button>Connect with invitation ↗</button></form>
+<div id="connected" hidden><h2>You’re connected.</h2><p id="account-label"></p><div class="toolbar"><button id="sync-now">Sync now ↔</button><button id="pair-device">Pair another device</button><button id="export-recovery">Save recovery kit</button><button id="disconnect">Disconnect this device</button></div><h3>Devices</h3><div id="device-list" class="list"></div></div>
+<div class="import-box"><label for="import-kit">Pairing or recovery kit file</label><input id="import-kit" type="file" accept=".json,application/json"><p class="tiny">A pairing kit expires after 10 minutes. Both kit types contain secret keys. Share pairing kits only with your own devices.</p></div></div>
+<div class="sync-scope"><span>✓ bookmarks · settings · workspaces · tabs · notes</span><span>Device-local: passwords · cookies · history · private tabs</span></div></section>
+<section id="privacy" class="view" hidden><span class="eyebrow">YOUR BROWSER. YOUR BOUNDARIES.</span><h1>A little breathing room.</h1><div class="home-grid"><article class="card"><h2>Make it yours</h2><label for="decoration">Amount of slop</label><select id="decoration"><option value="full">Full personal chaos</option><option value="soft">A little quieter</option><option value="quiet">Just the essentials</option></select><label for="theme">Dashboard colors</label><select id="theme"><option value="light">Lavender daylight</option><option value="dark">Charcoal night</option><option value="system">Follow my computer</option></select><label class="check"><input id="motion" type="checkbox"> Animate decorative accents</label><p class="tiny">System reduced-motion settings always take precedence.</p></article><article class="card"><h2>Room to focus</h2><button id="focus-toggle">Toggle focus mode</button><p>Hide the decorative dashboard while you work.</p><button data-command="reader">Open Chromium reader mode</button><p class="tiny">Use reader mode from the page you want to read.</p><button data-internal="settings/performance">Tab suspension settings ↗</button></article><article class="card"><h2>Site boundaries</h2><button id="shields">Boybrowse shields & exceptions ↗</button><button data-internal="settings/content">Permissions & site controls ↗</button><button data-internal="settings/privacy">Privacy settings ↗</button><button data-internal="extensions">Extensions ↗</button><p class="tiny">Chromium’s sandbox, site isolation, and certificate checks remain enabled.</p></article><article class="card"><h2>Keep your own history</h2><button data-internal="history">History ↗</button><button data-internal="downloads">Downloads ↗</button><button data-command="private">New temporary window ↗</button><p class="tiny">Temporary windows use Chromium’s incognito profile. Downloaded files remain on disk.</p></article></div></section>
+</main></div>
+<dialog id="palette"><div class="dialog-heading"><h2>Where to?</h2><button class="close" data-close="palette" aria-label="Close command palette">×</button></div><label class="sr-only" for="command-input">Search tabs and commands</label><input id="command-input" placeholder="a tab, a command, a new rabbit hole…"><div id="command-results" class="list"></div><p class="tiny">Tab to move · Enter to select · Escape to close</p></dialog>
+<dialog id="name-dialog"><form id="name-form"><h2 id="name-heading">Give it a name</h2><label for="new-name">Name</label><input id="new-name" maxlength="160" required><div class="toolbar"><button>Save ↗</button><button type="button" data-close="name-dialog">Cancel</button></div></form></dialog>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+<script type="module" src="app.mjs"></script>
+</body></html>

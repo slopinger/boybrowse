@@ -1,0 +1,26 @@
+source_set("boybrowse") {
+  sources = [ "boybrowse_ui.cc" ]
+  public = [ "boybrowse_ui.h" ]
+  public_deps = [ "//content/public/browser" ]
+  deps = [
+    "//base",
+    "//chrome/app:command_ids",
+    "//chrome/browser:browser_process",
+    "//chrome/browser/bookmarks",
+    "//components/bookmarks/browser",
+    "//chrome/browser/ui/tabs:tab_enums",
+    "//chrome/browser/ui/tabs:tabs_public",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui:browser_commands",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/navigator",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//components/os_crypt/async/browser",
+    "//components/os_crypt/async/common",
+    "//components/prefs",
+    "//components/split_tabs",
+    "//services/network/public/mojom",
+    "//ui/base",
+    "//url",
+  ]
+}

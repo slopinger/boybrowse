@@ -1,0 +1,71 @@
+name: Nix
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: nix-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    name: Linux protocol checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: DeterminateSystems/nix-installer-action@9383ce2bf08796b65508822f5982f49151badc4e
+        with:
+          extra-conf: |
+            sandbox = true
+            substituters = https://cache.nixos.org https://cache.kyouma.net
+            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= cache.kyouma.net:Frjwu4q1rnwE/MnSTmX9yx86GNA/z3p/oElGvucLiZg=
+      - name: Build tests with Nix
+        run: nix build .#checks.x86_64-linux.server .#checks.x86_64-linux.javascript .#checks.x86_64-linux.integration -L --no-link
+  macos:
+    name: macOS ARM64 source build
+    runs-on: macos-26
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Reclaim disposable runner storage
+        shell: bash
+        run: |
+          df -h /
+          selected_xcode="$(xcode-select -p | cut -d/ -f1-3)"
+          for app in /Applications/Xcode*.app; do
+            if [ "$app" != "$selected_xcode" ]; then sudo rm -rf "$app"; fi
+          done
+          sudo rm -rf /Library/Developer/CoreSimulator /Users/runner/Library/Caches /Users/runner/Library/Developer/CoreSimulator
+          df -h /
+      - uses: DeterminateSystems/nix-installer-action@9383ce2bf08796b65508822f5982f49151badc4e
+        with:
+          extra-conf: |
+            sandbox = true
+            max-jobs = 1
+            cores = 3
+      - name: Check build headroom
+        shell: bash
+        run: |
+          available_kib="$(df -k /nix | awk 'NR==2 {print $4}')"
+          if [ "$available_kib" -lt 104857600 ]; then
+            echo "::error::Chromium requires at least 100 GiB available. This runner has insufficient disk after cleanup."
+            exit 1
+          fi
+      - name: Build protocol tests with Nix
+        run: nix build .#checks.aarch64-darwin.server .#checks.aarch64-darwin.javascript .#checks.aarch64-darwin.integration -L --no-link
+      - name: Build the native browser with Nix
+        run: nix build .#packages.aarch64-darwin.default -L --out-link result
+      - name: Smoke test the built browser
+        run: nix build .#checks.aarch64-darwin.runtime -L --no-link
+      - name: Export Nix closure
+        run: |
+          nix-store --export $(nix-store -qR "$(readlink result)") > boybrowse-macos-arm64.nar
+          shasum -a 256 boybrowse-macos-arm64.nar > boybrowse-macos-arm64.nar.sha256
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: boybrowse-macos-arm64-preview
+          path: |
+            boybrowse-macos-arm64.nar
+            boybrowse-macos-arm64.nar.sha256
+          retention-days: 14
