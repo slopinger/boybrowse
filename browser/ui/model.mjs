@@ -13,6 +13,7 @@ export function createState() {
   return {version:1, records:[], cursor:0, pending:null};
 }
 export function editRecord(state, id, kind, payload) {
+  if (!id && kind === 'settings') id = '0'.repeat(32);
   let record = state.records.find(r => r.id === id);
   if (!record) { record = {id:id || uid(), revision:0, kind, payload:{}, dirty:true, deleted:false}; state.records.push(record); }
   record.payload = structuredClone(payload); record.kind = kind; record.dirty = true; record.deleted = false;
@@ -20,7 +21,7 @@ export function editRecord(state, id, kind, payload) {
 }
 export function deleteRecord(state, id) {
   const record = state.records.find(r => r.id === id);
-  if (record) { record.deleted = true; record.dirty = true; }
+  if (record) { record.deleted = true; record.dirty = true; record.payload = {}; }
 }
 export function recordsOf(state, kind) {
   return state.records.filter(r => !r.deleted && r.kind === kind);
@@ -38,6 +39,6 @@ export function mergeRemote(state, remote, value) {
     }
   }
   const next = {id:remote.id, revision:remote.revision, deleted:!!remote.deleted, dirty:false,
-    kind:value?.kind || local?.kind || 'unknown', payload:value?.payload || {}};
+    kind:value?.kind || local?.kind || 'unknown', payload:remote.deleted ? {} : (value?.payload || {})};
   if (local) Object.assign(local, next); else state.records.push(next);
 }

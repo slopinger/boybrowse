@@ -19,6 +19,7 @@ test('records survive serialization, delete with tombstones, and preserve concur
   mergeRemote(state,{id:note.id,revision:1,deleted:0},{kind:'note',payload:{text:'stale'}});
   assert.equal(state.records[0].payload.text,'remote');
   deleteRecord(state,note.id); assert.equal(recordsOf(state,'note').length,1);
+  assert.deepEqual(note.payload,{},'deleted note contents are dropped from current profile state');
   assert.deepEqual(JSON.parse(JSON.stringify(state)),state);
 });
 test('remote deletion preserves an unsent edit as a conflict copy', () => {

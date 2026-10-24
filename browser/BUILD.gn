@@ -1,5 +1,5 @@
 source_set("boybrowse") {
-  sources = [ "boybrowse_ui.cc" ]
+  sources = [ "boybrowse_ui.cc", "resources.h" ]
   public = [ "boybrowse_ui.h" ]
   public_deps = [ "//content/public/browser" ]
   deps = [
@@ -8,6 +8,8 @@ source_set("boybrowse") {
     "//chrome/browser:browser_process",
     "//chrome/browser/bookmarks",
     "//components/bookmarks/browser",
+    "//components/bookmarks/common",
+    "//components/sessions",
     "//chrome/browser/ui/tabs:tab_enums",
     "//chrome/browser/ui/tabs:tabs_public",
     "//chrome/browser/profiles:profile",

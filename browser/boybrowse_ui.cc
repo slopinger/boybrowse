@@ -3,6 +3,8 @@
 
 #include <string>
 #include <utility>
+#include <vector>
+#include <optional>
 #include "base/base64.h"
 #include "base/json/json_writer.h"
 #include "base/functional/bind.h"
@@ -14,6 +16,10 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "components/bookmarks/browser/bookmark_model.h"
+#include "components/bookmarks/browser/bookmark_client.h"
+#include "components/bookmarks/common/bookmark_metrics.h"
+#include "base/uuid.h"
+#include "components/sessions/content/session_tab_helper.h"
 #include "components/bookmarks/browser/bookmark_node.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/split_tab_metrics.h"
@@ -90,14 +96,15 @@ class Handler : public content::WebUIMessageHandler {
     if (args.size() != 3 || !args[0].is_string() || !args[1].is_string() || !args[2].is_dict()) return;
     AllowJavascript();
     const auto& callback = args[0];
+    if (profile()->IsOffTheRecord()) { Fail(callback, "Temporary windows do not use Boybrowse sync or saved data"); return; }
     const auto& op = args[1].GetString();
     const auto& data = args[2].GetDict();
     if (op == "state.read") {
       Reply(callback, base::Value(profile()->GetPrefs()->GetDict(kState).Clone())); return;
     }
     if (op == "state.save") {
-      // Cap the serialized state on the renderer side and total value memory here.
-      if (base::WriteJson(data).value_or("").size() > 2 * 1024 * 1024) { Fail(callback, "State too large"); return; }
+      // Bound profile preferences including the durable encrypted outbox.
+      if (base::WriteJson(data).value_or("").size() > 32 * 1024 * 1024) { Fail(callback, "State too large"); return; }
       int generation = profile()->GetPrefs()->GetDict(kState).FindInt("_generation").value_or(0);
       if (data.FindInt("_generation").value_or(0) != generation) {
         Fail(callback, "Another Boybrowse page saved changes. Reload before editing to keep both windows safe."); return;
@@ -127,15 +134,53 @@ class Handler : public content::WebUIMessageHandler {
       Navigate(&params);
       Reply(callback, base::Value(true)); return;
     }
+    if (op == "bookmarks.apply") {
+      auto* model = BookmarkModelFactory::GetForBrowserContext(profile());
+      const auto* records = data.FindList("records");
+      if (!model || !model->loaded() || !records || records->size() > 5000) { Fail(callback, "Invalid bookmark batch"); return; }
+      // Validate the whole batch before touching Chromium's model.
+      for (const auto& value : *records) {
+        if (!value.is_dict()) { Fail(callback, "Invalid bookmark"); return; }
+        const auto& row = value.GetDict();
+        const auto* guid = row.FindString("guid");
+        const auto* title = row.FindString("title");
+        const auto* url = row.FindString("url");
+        if (!guid || !base::Uuid::ParseLowercase(*guid).is_valid() ||
+            !title || title->size() > 16384 ||
+            !url || url->size() > 8192 ||
+            (!row.FindBool("deleted").value_or(false) && !GURL(*url).SchemeIsHTTPOrHTTPS())) {
+          Fail(callback, "Invalid bookmark data"); return;
+        }
+      }
+      for (const auto& value : *records) {
+        const auto& row = value.GetDict();
+        auto guid = base::Uuid::ParseLowercase(*row.FindString("guid"));
+        auto* existing = model->GetNodeByUuid(guid, bookmarks::BookmarkModel::NodeTypeForUuidLookup::kLocalOrSyncableNodes);
+        if (existing && (!existing->is_url() || model->client()->IsNodeManaged(existing))) continue;
+        if (row.FindBool("deleted").value_or(false)) {
+          if (existing) model->Remove(existing, bookmarks::metrics::BookmarkEditSource::kOther, FROM_HERE);
+        } else if (existing) {
+          model->SetTitle(existing, base::UTF8ToUTF16(*row.FindString("title")), bookmarks::metrics::BookmarkEditSource::kOther);
+          model->SetURL(existing, GURL(*row.FindString("url")), bookmarks::metrics::BookmarkEditSource::kOther);
+        } else {
+          model->AddURL(model->other_node(), model->other_node()->children().size(),
+              base::UTF8ToUTF16(*row.FindString("title")), GURL(*row.FindString("url")),
+              nullptr, std::nullopt, guid, false);
+        }
+      }
+      Reply(callback, base::Value(true)); return;
+    }
     if (op == "bookmarks.list") {
       auto* model = BookmarkModelFactory::GetForBrowserContext(profile());
       if (!model || !model->loaded()) { Fail(callback, "Bookmarks are still loading"); return; }
       base::ListValue result;
-      std::vector<const bookmarks::BookmarkNode*> queue{model->root_node()};
+      std::vector<const bookmarks::BookmarkNode*> queue{model->bookmark_bar_node(), model->other_node(), model->mobile_node()};
       while (!queue.empty() && result.size() < 5000) {
         auto* current = queue.back(); queue.pop_back();
+        if (!current || model->client()->IsNodeManaged(current)) continue;
         if (current->is_url()) {
           base::DictValue bookmark;
+          bookmark.Set("guid", current->uuid().AsLowercaseString());
           bookmark.Set("title", base::UTF16ToUTF8(current->GetTitle()));
           bookmark.Set("url", current->url().spec());
           result.Append(std::move(bookmark));
@@ -153,10 +198,12 @@ class Handler : public content::WebUIMessageHandler {
         auto* contents = tabs->GetWebContentsAt(i);
         base::DictValue row;
         row.Set("index", i);
+        row.Set("id", sessions::SessionTabHelper::IdForTab(contents).id());
         row.Set("title", base::UTF16ToUTF8(contents->GetTitle()));
         row.Set("url", contents->GetVisibleURL().spec());
         row.Set("active", i == tabs->active_index());
         row.Set("pinned", tabs->IsTabPinned(i));
+        row.Set("split", tabs->GetSplitForTab(i).has_value());
         result.Append(std::move(row));
       }
       Reply(callback, base::Value(std::move(result))); return;
@@ -186,16 +233,32 @@ class Handler : public content::WebUIMessageHandler {
       Reply(callback, base::Value(true)); return;
     }
     auto index = data.FindInt("index");
+    if (auto id = data.FindInt("tab")) {
+      index = -1;
+      for (int i = 0; i < tabs->count(); ++i)
+        if (sessions::SessionTabHelper::IdForTab(tabs->GetWebContentsAt(i)).id() == *id) index = i;
+    }
     if (!index || *index < 0 || *index >= tabs->count()) { Fail(callback, "Tab no longer exists"); return; }
     if (op == "tabs.activate") tabs->ActivateTabAt(*index);
     else if (op == "tabs.pin") tabs->SetTabPinned(*index, !tabs->IsTabPinned(*index));
     else if (op == "tabs.move") {
       auto target = data.FindInt("target");
+      if (auto id = data.FindInt("targetTab")) {
+        target = -1;
+        for (int i = 0; i < tabs->count(); ++i)
+          if (sessions::SessionTabHelper::IdForTab(tabs->GetWebContentsAt(i)).id() == *id) target = i;
+      }
       if (!target || *target < 0 || *target >= tabs->count()) { Fail(callback, "Invalid target"); return; }
       tabs->MoveWebContentsAt(*index, *target, false);
     } else if (op == "tabs.split") {
       auto target = data.FindInt("target");
+      if (auto id = data.FindInt("targetTab")) {
+        target = -1;
+        for (int i = 0; i < tabs->count(); ++i)
+          if (sessions::SessionTabHelper::IdForTab(tabs->GetWebContentsAt(i)).id() == *id) target = i;
+      }
       if (!target || *target < 0 || *target >= tabs->count() || *target == *index ||
+          tabs->GetSplitForTab(*index) || tabs->GetSplitForTab(*target) ||
           tabs->IsTabPinned(*index) != tabs->IsTabPinned(*target) ||
           tabs->GetTabGroupForTab(*index) != tabs->GetTabGroupForTab(*target)) {
         Fail(callback, "Select two tabs with the same pin and group state"); return;

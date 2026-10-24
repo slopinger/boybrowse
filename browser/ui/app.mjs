@@ -1,10 +1,11 @@
 import {native} from './bridge.mjs';
 import {createState, editRecord, deleteRecord, recordsOf, safeURL, uid} from './model.mjs';
 import {SyncClient} from './sync.mjs';
+import {captureNativeData,applyNativeData} from './native-sync.mjs';
 
 const $ = id => document.getElementById(id);
 let state = createState(), tabs = [], noteId = null, toastTimer;
-let saveQueue = Promise.resolve(), naming, generation = 0, unsaved = 0;
+let saveQueue = Promise.resolve(), naming, generation = 0, unsaved = 0, saveFailed = false;
 function notify(message) {
   $('toast').textContent = message; $('toast').hidden = false;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').hidden = true, 6500);
@@ -26,8 +27,8 @@ function save() {
   saveQueue = saveQueue.catch(() => {}).then(async () => {
     snapshot._generation = generation;
     generation = await native('state.save', snapshot);
-    state._generation = generation;
-  }).finally(() => {unsaved--;});
+    state._generation = generation; saveFailed = false;
+  }).catch(error => {saveFailed = true;throw error;}).finally(() => {unsaved--;});
   return saveQueue;
 }
 const client = new SyncClient({state, save, secret:{}, saveSecret: secret => native('secret.save',{value:JSON.stringify(secret)})});
@@ -77,20 +78,20 @@ async function refreshTabs() {
   for (const tab of tabs) {
     const item = row(tab.title || tab.url,tab.url);
     item.draggable = true;
-    item.addEventListener('dragstart',e => e.dataTransfer.setData('text/plain',String(tab.index)));
+    item.addEventListener('dragstart',e => e.dataTransfer.setData('text/plain',JSON.stringify({tab:tab.id,index:tab.index})));
     item.addEventListener('dragover',e => e.preventDefault());
     item.addEventListener('drop',guard(async e => {
       e.preventDefault();
-      const index = Number(e.dataTransfer.getData('text/plain'));
-      if (!Number.isInteger(index)) return;
-      await native('tabs.move',{index,target:tab.index}); await refreshTabs();
+      const source = JSON.parse(e.dataTransfer.getData('text/plain'));
+      if (!Number.isInteger(source.tab)) return;
+      await native('tabs.move',{...source,target:tab.index,targetTab:tab.id}); await refreshTabs();
     }));
     const select = node('input'); select.type = 'checkbox'; select.dataset.index = tab.index;
     select.setAttribute('aria-label','Select ' + (tab.title || tab.url) + ' for split view');
     item.prepend(select);
-    item.append(action('Open', () => native('tabs.activate',{index:tab.index})),
-      action(tab.pinned ? 'Unpin' : 'Pin',async () => {await native('tabs.pin',{index:tab.index}); await refreshTabs();}),
-      action('×',async () => {await native('tabs.close',{index:tab.index}); await refreshTabs();}));
+    item.append(action('Open', () => native('tabs.activate',{index:tab.index,tab:tab.id})),
+      action(tab.pinned ? 'Unpin' : 'Pin',async () => {await native('tabs.pin',{index:tab.index,tab:tab.id}); await refreshTabs();}),
+      action('×',async () => {await native('tabs.close',{index:tab.index,tab:tab.id}); await refreshTabs();}));
     item.lastChild.setAttribute('aria-label','Close ' + (tab.title || tab.url));
     list.append(item);
   }
@@ -109,7 +110,7 @@ async function saveWorkspace() {
 }
 function renderWorkspaces() {
   const list = $('workspace-list'); list.replaceChildren();
-  const records = recordsOf(state,'workspace');
+  const records = [...recordsOf(state,'workspace'),...recordsOf(state,'tabs').filter(r => r.payload.device !== client.secret?.device)];
   if (!records.length) return empty(list,'No rooms yet. Save a window full of tabs to begin.');
   for (const record of records) {
     const card = node('article',undefined,'card');
@@ -118,7 +119,7 @@ function renderWorkspaces() {
     card.append(action('Open workspace ↗',async () => {
       for (const page of record.payload.pages.slice(0,100)) await navigate(page.url);
     }),action('Rename',() => nameDialog('Rename workspace',record.payload.title,async title => {
-      editRecord(state,record.id,'workspace',{...record.payload,title}); await save(); renderWorkspaces();
+      editRecord(state,record.id,record.kind,{...record.payload,title}); await save(); renderWorkspaces();
     })),action('Delete',async () => {deleteRecord(state,record.id); await save(); renderWorkspaces();}));
     list.append(card);
   }
@@ -180,10 +181,21 @@ async function renderSync() {
     list.append(item);
   }
 }
-async function synchronize() {
+let synchronization;
+function synchronize() {
+  if (!synchronization) synchronization = synchronizeOnce().finally(() => {synchronization = null;});
+  return synchronization;
+}
+async function synchronizeOnce() {
   $('sync-status').textContent = '↔ syncing…';
   try {
-    await client.run();
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const baseline = await captureNativeData(state,client.secret,native); await save();
+      await client.run();
+      await applyNativeData(state,native,baseline); await save();
+      if (!state.records.some(r => r.dirty)) break;
+      if (attempt === 2) throw new Error('Your recent changes are saved. Sync again shortly to finish sending them.');
+    }
     applySettings(); $('sync-status').textContent = '● encrypted sync connected';
     notify('Your corner is up to date.');
     const current = location.hash.slice(1); if (current === 'notes') renderNotes(); if (current === 'workspaces') renderWorkspaces();
@@ -203,7 +215,7 @@ const commands = [
 ];
 function renderCommands() {
   const input = $('command-input').value.toLowerCase(), list = $('command-results'); list.replaceChildren();
-  const choices = [...commands,...tabs.map(t => ['Tab: ' + (t.title || t.url),() => native('tabs.activate',{index:t.index})])];
+  const choices = [...commands,...tabs.map(t => ['Tab: ' + (t.title || t.url),() => native('tabs.activate',{index:t.index,tab:t.id})])];
   for (const [title,fn] of choices.filter(([title]) => title.toLowerCase().includes(input)).slice(0,18))
     list.append(action(title,async () => {$('palette').close(); await fn();}));
   if (input.trim()) list.append(action('Search the web for “' + $('command-input').value + '”',async () => {
@@ -229,7 +241,7 @@ $('refresh-tabs').addEventListener('click',guard(refreshTabs));
 $('split-tabs').addEventListener('click',guard(async () => {
   const selected = [...$('tab-list').querySelectorAll('input:checked')].map(input => Number(input.dataset.index));
   if (selected.length !== 2) throw new Error('Select exactly two tabs for split view');
-  await native('tabs.split',{index:selected[0],target:selected[1]});
+  await native('tabs.split',{index:selected[0],target:selected[1],tab:tabs.find(t => t.index === selected[0]).id,targetTab:tabs.find(t => t.index === selected[1]).id});
 }));
 $('shields').addEventListener('click',guard(() => native('blocker.open')));
 $('private-window').addEventListener('click',guard(() => native('command',{name:'private'})));
@@ -277,5 +289,5 @@ async function boot() {
   await refreshTabs();
   if (client.secret?.token) $('sync-status').textContent = '● encrypted sync connected';
 }
-window.addEventListener('beforeunload',event => {if (unsaved) {event.preventDefault();event.returnValue = '';}});
+window.addEventListener('beforeunload',event => {if (unsaved || saveFailed) {event.preventDefault();event.returnValue = '';}});
 guard(boot)();

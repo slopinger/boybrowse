@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {SyncClient} from '../browser/ui/sync.mjs';
 import {createState,editRecord,deleteRecord,uid} from '../browser/ui/model.mjs';
-import {newKey} from '../browser/ui/crypto.mjs';
+import {newKey,decrypt} from '../browser/ui/crypto.mjs';
 
 function server() {
   let revision = 0, drop = false;
@@ -48,6 +48,8 @@ test('two devices sync encrypted records, offline conflicts, and authenticated t
   await a.client.run(); await b.client.run();
   assert(b.state.records.find(r => r.id === original.id).deleted);
   assert(host.records.get(original.id).ciphertext.length > 38);
+  assert.deepEqual((await decrypt(key,original.id,host.records.get(original.id).ciphertext)).payload,{});
+  assert.deepEqual(b.state.records.find(r => r.id === original.id).payload,{});
 });
 test('durable outbox retries an ambiguous write without duplicating or losing data',async () => {
   const host = server(), a = device(host,newKey());
