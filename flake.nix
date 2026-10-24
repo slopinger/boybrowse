@@ -98,32 +98,36 @@
     checks = each (system: let p = mk system; in ({
       server = p.server;
       browser = p.browser;
-      runtime = p.pkgs.runCommand "boybrowse-native-smoke" { nativeBuildInputs = [ p.pkgs.coreutils ]; } ''
+      runtime = p.pkgs.runCommand "boybrowse-native-runtime" {
+        nativeBuildInputs = [ p.pkgs.nodejs p.pkgs.coreutils ];
+        __darwinAllowLocalNetworking = true;
+      } ''
         mkdir -p $out $TMPDIR/runtime
         chmod 700 $TMPDIR/runtime
         export XDG_RUNTIME_DIR=$TMPDIR/runtime
         # The outer Nix sandbox isolates this disposable test profile. Shipping
         # wrappers never pass --no-sandbox.
-        timeout 120 ${p.browser}/bin/boybrowse --headless --no-sandbox --disable-gpu \
-          --disable-dev-shm-usage --user-data-dir=$TMPDIR/profile \
-          --virtual-time-budget=5000 --dump-dom chrome://boybrowse/ \
-          > $out/dashboard.html 2> $out/browser.log
-        grep -q 'data-decoration="full"' $out/dashboard.html
-        grep -q 'Brain scraps' $out/dashboard.html
+        timeout 300 node ${self}/tests/native-runtime.mjs ${p.browser}/bin/boybrowse $out
       '';
       integration = p.pkgs.runCommand "boybrowse-sync-integration" { nativeBuildInputs = [ p.pkgs.nodejs ]; __darwinAllowLocalNetworking = true; } ''
         node ${self}/tests/integration.mjs ${p.server}
         touch $out
       '';
+      tooling = p.pkgs.runCommand "boybrowse-source-tooling-tests" { nativeBuildInputs = [ p.pkgs.python3 ]; } ''
+        export PYTHONDONTWRITEBYTECODE=1
+        python3 ${self}/tests/test_patch_tools.py
+        touch $out
+      '';
       javascript = p.pkgs.runCommand "boybrowse-javascript-tests" { nativeBuildInputs = [ p.pkgs.nodejs ]; } ''
         cd ${self}
+        for script in browser/ui/*.mjs tests/*.mjs; do node --check "$script"; done
         node --test tests/*.test.mjs
         touch $out
       '';
     }) // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
       nixos = import ./nix/server-test.nix { inherit self; pkgs = p.pkgs; };
     });
-    hydraJobs = (nixpkgs.lib.genAttrs [ "browser" "server" "javascript" "integration" ]
+    hydraJobs = (nixpkgs.lib.genAttrs [ "browser" "runtime" "server" "javascript" "integration" "tooling" ]
       (name: nixpkgs.lib.genAttrs linuxSystems (system: self.checks.${system}.${name}))) // {
         nixos.x86_64-linux = self.checks.x86_64-linux.nixos;
       };

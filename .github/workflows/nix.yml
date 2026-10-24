@@ -21,7 +21,7 @@ jobs:
             substituters = https://cache.nixos.org https://cache.kyouma.net
             trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= cache.kyouma.net:Frjwu4q1rnwE/MnSTmX9yx86GNA/z3p/oElGvucLiZg=
       - name: Build tests with Nix
-        run: nix build .#checks.x86_64-linux.server .#checks.x86_64-linux.javascript .#checks.x86_64-linux.integration -L --no-link
+        run: nix build .#checks.x86_64-linux.server .#checks.x86_64-linux.javascript .#checks.x86_64-linux.integration .#checks.x86_64-linux.tooling -L --no-link
   macos:
     name: macOS ARM64 source build
     runs-on: macos-26
@@ -53,7 +53,7 @@ jobs:
             exit 1
           fi
       - name: Build protocol tests with Nix
-        run: nix build .#checks.aarch64-darwin.server .#checks.aarch64-darwin.javascript .#checks.aarch64-darwin.integration -L --no-link
+        run: nix build .#checks.aarch64-darwin.server .#checks.aarch64-darwin.javascript .#checks.aarch64-darwin.integration .#checks.aarch64-darwin.tooling -L --no-link
       - name: Build the native browser with Nix
         run: nix build .#packages.aarch64-darwin.default -L --out-link result
       - name: Smoke test the built browser
