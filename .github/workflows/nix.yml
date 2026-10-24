@@ -73,23 +73,24 @@ jobs:
             cd src
             export PATH="$PATH:/bin:/usr/bin:/usr/sbin"
             gn --version
+            # The last build file gn opens before it spins identifies the looping script.
+            fs_usage -w -f pathname gn > /tmp/gn-fs.log 2>&1 &
+            sleep 2
             # script(1) gives gn a pty, so its output is line-buffered and survives being killed.
-            (timeout 200 script -q /tmp/gn-outside.log gn gen --verbose --time out/Release --args="$2" > /dev/null 2>&1; echo "gn exit: $?" >> /tmp/gn-outside.log) &
-            sleep 60
-            echo "--- processes after 60s"
-            ps -axo pid,ppid,etime,%cpu,command | grep -E "gn gen|python|node|clang|rustc|PID" | grep -v grep
-            echo "--- gn log so far"
-            cat /tmp/gn-outside.log | tail -40
-            for pid in $(pgrep -f "gn gen --verbose"; pgrep -f "python3 .*build/"); do
-              echo "--- sample $pid"
-              sample "$pid" 3 -file /tmp/sample-$pid.txt > /dev/null 2>&1
-              head -45 /tmp/sample-$pid.txt
-              echo "--- open files $pid"
-              lsof -p "$pid" 2>&1 | grep -v -E "\.dylib|/usr/lib|/System" | tail -15
-            done
-            sleep 150
-            echo "--- gn log at end"
-            tail -40 /tmp/gn-outside.log
+            (timeout 90 script -q /tmp/gn-outside.log gn gen --verbose --time out/Release --args="$2" > /dev/null 2>&1; echo "gn exit: $?" >> /tmp/gn-outside.log) &
+            sleep 45
+            gn_pid="$(pgrep -x gn | head -1)"
+            echo "--- gn $gn_pid after 45s"
+            ps -o pid,etime,%cpu,rss -p "$gn_pid"
+            sample "$gn_pid" 3 -file /tmp/sample-gn.txt > /dev/null 2>&1
+            echo "--- gn call graph"
+            sed -n "/^Call graph:/,/^Total number/p" /tmp/sample-gn.txt | sed -E "s/ *\[0x[0-9a-f]+\]//; s/\(in gn\)//" | cut -c1-170 | head -150
+            sleep 50
+            pkill fs_usage
+            echo "--- last build files gn opened"
+            grep -E "open|stat" /tmp/gn-fs.log | grep -E "\.gni?( |$)" | tail -25 | cut -c1-230
+            echo "--- gn log"
+            tail -20 /tmp/gn-outside.log
           ' _ "$dir" 'is_debug=false is_official_build=false is_component_build=false symbol_level=0 blink_symbol_level=0 v8_symbol_level=0 target_cpu="arm64" target_os="mac" use_system_xcode=false is_chrome_branded=false chrome_pgo_phase=0 use_remoteexec=false use_siso=false enable_nacl=false enable_widevine=false use_typescript_go=false devtools_use_typescript_go=false treat_warnings_as_errors=false use_lld=true'
       - name: Smoke test the built browser
         run: nix build .#checks.aarch64-darwin.runtime -L --no-link
