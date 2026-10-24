@@ -102,9 +102,11 @@ in pkgs.stdenv.mkDerivation {
     # A silent GN hang once burned two hours of macOS CI. GN's piped output is block-buffered and lost
     # when it is killed, so run it on a pty (line-buffered, streams into the log) and, on a stall,
     # report the process tree and a stack sample before failing.
+    # extra_cflags: nixpkgs strips resolv.h and iconv.h from the SDK and ships them as separate packages;
+    # -isystem (not CPATH) keeps Chromium's raw_ptr clang plugin from checking those headers.
     # use_unified_system_module=false (as nixpkgs does for Linux): otherwise build/modules/BUILD.gn
     # expand_directory()s the whole Nix SDK sysroot recursively and gn spins at 100% CPU for hours.
-    python3 -c 'import pty, sys; sys.exit(pty.spawn(sys.argv[1:]) >> 8)' gn gen --verbose --time out/Release --args='is_debug=false is_official_build=false is_component_build=false symbol_level=0 blink_symbol_level=0 v8_symbol_level=0 target_cpu="arm64" target_os="mac" use_system_xcode=false is_chrome_branded=false chrome_pgo_phase=0 use_remoteexec=false use_siso=false enable_nacl=false enable_widevine=false use_typescript_go=false devtools_use_typescript_go=false treat_warnings_as_errors=false use_lld=true use_clang_modules=false use_unified_system_module=false v8_use_metagen_instance_types=false' &
+    python3 -c 'import pty, sys; sys.exit(pty.spawn(sys.argv[1:]) >> 8)' gn gen --verbose --time out/Release --args='is_debug=false is_official_build=false is_component_build=false symbol_level=0 blink_symbol_level=0 v8_symbol_level=0 target_cpu="arm64" target_os="mac" use_system_xcode=false is_chrome_branded=false chrome_pgo_phase=0 use_remoteexec=false use_siso=false enable_nacl=false enable_widevine=false use_typescript_go=false devtools_use_typescript_go=false treat_warnings_as_errors=false use_lld=true use_clang_modules=false use_unified_system_module=false v8_use_metagen_instance_types=false extra_cflags="-isystem ${lib.getDev pkgs.darwin.libresolv}/include -isystem ${lib.getDev pkgs.libiconv}/include"' &
     gn_pid=$!
     for _ in $(seq 30); do
       sleep 10
@@ -126,9 +128,6 @@ in pkgs.stdenv.mkDerivation {
     # rustc takes its Mach-O minimum from this variable; the Nix SDK defaults it to a newer release than
     # Chromium's mac_deployment_target (13.0), which makes ld64.lld reject the Rust host tools' objects.
     export MACOSX_DEPLOYMENT_TARGET=13.0
-    # nixpkgs strips resolv.h and iconv.h from the SDK and propagates them as separate packages, whose
-    # include paths only reach nixpkgs' cc wrapper. Chromium's own clang finds them through CPATH.
-    export CPATH="${lib.getDev pkgs.darwin.libresolv}/include:${lib.getDev pkgs.libiconv}/include"
     ninja -C out/Release -j$NIX_BUILD_CORES chrome
     runHook postBuild
   '';
