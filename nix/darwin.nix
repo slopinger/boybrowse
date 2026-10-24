@@ -69,6 +69,11 @@ in pkgs.stdenv.mkDerivation {
     mkdir -p third_party/llvm-build/Release+Asserts/bin
     ln -sf ${pkgs.gperf}/bin/gperf third_party/llvm-build/Release+Asserts/bin/gperf
     ln -sf ${pkgs.cctools}/bin/libtool third_party/llvm-build/Release+Asserts/bin/libtool
+    # Crashpad's mig.py runs bin/mig with libexec/migcom next to it (Apple's bootstrap_cmds).
+    test -x ${pkgs.darwin.bootstrap_cmds}/bin/mig && test -x ${pkgs.darwin.bootstrap_cmds}/libexec/migcom
+    mkdir -p third_party/llvm-build/Release+Asserts/libexec
+    ln -sf ${pkgs.darwin.bootstrap_cmds}/bin/mig third_party/llvm-build/Release+Asserts/bin/mig
+    ln -sf ${pkgs.darwin.bootstrap_cmds}/libexec/migcom third_party/llvm-build/Release+Asserts/libexec/migcom
     mkdir -p third_party/node/mac_arm64/node-darwin-arm64/bin
     ln -sf ${pkgs.nodejs}/bin/node third_party/node/mac_arm64/node-darwin-arm64/bin/node
     mkdir -p third_party/typescript/mac-arm64/src third_party/devtools-frontend/src/third_party/esbuild third_party/gperf/cipd/bin
