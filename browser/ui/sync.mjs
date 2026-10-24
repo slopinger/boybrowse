@@ -28,9 +28,9 @@ export class SyncClient {
     // Verify OS-protected storage before creating a remote account.
     await this.saveSecret(this.secret);
     const result = await this.request('enroll', {invitation,name}, 'POST', true);
-    Object.assign(this.secret, result);
+    Object.assign(this.secret, result, {name});
     this.state.cursor = 0; this.state.pending = null;
-    for (const r of this.state.records) { r.id = uid(); r.revision = 0; r.dirty = true; }
+    for (const r of this.state.records) { r.revision = 0; r.dirty = true; }
     await this.saveSecret(this.secret); await this.save();
     return result;
   }
@@ -46,10 +46,10 @@ export class SyncClient {
     if (bundle.version !== 1 || typeof bundle.key !== 'string') throw new Error('Invalid recovery kit');
     this.secret = {server:this.endpoint(bundle.server), key:bundle.key};
     const result = await this.request('recover', {account:bundle.account, recovery:bundle.recovery, name}, 'POST', true);
-    Object.assign(this.secret,result);
+    Object.assign(this.secret,result,{name});
     this.state.cursor = 0; this.state.pending = null;
-    // Preserve this installation's data as new records rather than overwriting remote records.
-    for (const record of this.state.records) { record.id = uid(); record.revision = 0; record.dirty = true; }
+    // Reset bases and let the conflict resolver preserve offline edits on recovery.
+    for (const record of this.state.records) { record.revision = 0; record.dirty = true; }
     await this.saveSecret(this.secret); await this.save();
   }
   async run() {
@@ -59,7 +59,7 @@ export class SyncClient {
   }
   async sendPending() {
     const pending = this.state.pending;
-    if (!pending) return;
+    if (!pending) return true;
     try {
       const result = await this.request('records', {operation:pending.operation, records:pending.records});
       for (const written of result.records) {
@@ -68,44 +68,58 @@ export class SyncClient {
           record.revision = written.revision;
           // Edits made while the request was in flight remain dirty.
           const sent = pending.snapshots[record.id];
-          if (JSON.stringify(record.payload) === sent.payload && record.deleted === sent.deleted) record.dirty = false;
+          if (JSON.stringify(record.payload) === sent.payload && record.deleted === sent.deleted && record.kind === sent.kind) record.dirty = false;
         }
       }
       this.state.pending = null;
       await this.save();
+      return true;
     } catch (error) {
-      if (error.status === 409) { this.state.pending = null; await this.save(); }
-      else throw error;
+      if (error.status === 409) { this.state.pending = null; await this.save(); return false; }
+      throw error;
     }
   }
   async exchange() {
     if (!this.secret?.token) throw new Error('Connect a sync account first');
     await this.sendPending();
-    let more = true;
-    while (more) {
-      const result = await this.request('records?cursor=' + this.state.cursor);
-      // Authenticate the entire page before changing the cursor or local records.
-      const decoded = await Promise.all(result.records.map(async r => {
-        const value = await decrypt(this.secret.key, r.id, r.ciphertext);
-        if (value.deleted !== !!r.deleted) throw new Error('Sync record authentication failed');
-        return [r,value];
-      }));
-      for (const [remote,value] of decoded) mergeRemote(this.state, remote, value);
-      this.state.cursor = result.cursor; more = !!result.more;
-      await this.save();
+    // A write can race another device after the pull. Re-pull and preserve a
+    // conflict copy before retrying; never report a rejected write as synced.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      let more = true;
+      while (more) {
+        const result = await this.request('records?cursor=' + this.state.cursor);
+        // Authenticate the entire page before changing the cursor or local records.
+        const decoded = await Promise.all(result.records.map(async r => {
+          const value = await decrypt(this.secret.key, r.id, r.ciphertext);
+          if (value.deleted !== !!r.deleted) throw new Error('Sync record authentication failed');
+          return [r,value];
+        }));
+        for (const [remote,value] of decoded) mergeRemote(this.state, remote, value);
+        this.state.cursor = result.cursor; more = !!result.more;
+        await this.save();
+      }
+      const dirty = this.state.records.filter(r => r.dirty);
+      let offset = 0, conflicted = false;
+      while (offset < dirty.length) {
+        const snapshots = {}, records = [];
+        let bytes = 128; // JSON envelope and operation ID.
+        while (offset < dirty.length && records.length < 32) {
+          const r = structuredClone(dirty[offset]);
+          const record = {id:r.id,base:r.revision,deleted:r.deleted ? 1 : 0,
+            ciphertext:await encrypt(this.secret.key,r.id,{kind:r.kind,payload:r.payload,deleted:r.deleted})};
+          if (record.ciphertext.length > 349528) throw new Error('A sync item is too large. Shorten the note or workspace before retrying.');
+          const size = JSON.stringify(record).length + 1;
+          // Leave headroom below the server's 5 MiB request limit.
+          if (bytes + size > 4 * 1024 * 1024) break;
+          records.push(record); bytes += size; offset++;
+          snapshots[r.id] = {payload:JSON.stringify(r.payload), deleted:r.deleted, kind:r.kind};
+        }
+        this.state.pending = {operation:uid(),records,snapshots};
+        await this.save(); // Durable outbox exists before the network write.
+        if (!await this.sendPending()) { conflicted = true; break; }
+      }
+      if (!conflicted && !this.state.records.some(r => r.dirty)) return;
     }
-    const dirty = this.state.records.filter(r => r.dirty);
-    for (let offset = 0; offset < dirty.length; offset += 32) {
-      const batch = dirty.slice(offset, offset + 32);
-      const snapshots = {};
-      const records = await Promise.all(batch.map(async r => {
-        snapshots[r.id] = {payload:JSON.stringify(r.payload), deleted:r.deleted};
-        return {id:r.id,base:r.revision,deleted:r.deleted ? 1 : 0,
-          ciphertext:await encrypt(this.secret.key,r.id,{kind:r.kind,payload:r.payload,deleted:r.deleted})};
-      }));
-      this.state.pending = {operation:uid(),records,snapshots};
-      await this.save(); // Durable outbox exists before the network write.
-      await this.sendPending();
-    }
+    throw new Error('Other devices are changing these items. Your edits are saved; sync again shortly.');
   }
 }

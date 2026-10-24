@@ -65,6 +65,55 @@ test('ciphertext or deletion-bit tampering cannot advance the local cursor',asyn
   await assert.rejects(b.client.run(),/authentication/);
   assert.equal(b.state.cursor,0); assert.equal(b.state.records.length,0);
 });
+test('large batches stay below the HTTP body limit and oversized individual items remain local',async () => {
+  const host = server(), a = device(host,newKey()), writes = [];
+  a.client.fetcher = async (url,options) => {
+    if (options.method === 'POST') {
+      writes.push(Buffer.byteLength(options.body));
+      assert(writes.at(-1) < 4 * 1024 * 1024);
+    }
+    return host.fetcher(url,options);
+  };
+  for (let i = 0; i < 24; i++) editRecord(a.state,null,'note',{text:'x'.repeat(200000)});
+  await a.client.run();
+  assert.equal(host.records.size,24);
+  assert.equal(writes.length,2);
+  const tooLarge = editRecord(a.state,null,'note',{text:'🦈'.repeat(100000)});
+  await assert.rejects(a.client.run(),/too large/);
+  assert(tooLarge.dirty);
+  assert.equal(host.records.size,24);
+});
+test('a write racing another device is resolved before reporting sync success',async () => {
+  const host = server(), key = newKey(), a = device(host,key), b = device(host,key);
+  const note = editRecord(a.state,null,'note',{text:'first'});
+  await a.client.run(); await b.client.run();
+  editRecord(a.state,note.id,'note',{text:'local'});
+  editRecord(b.state,note.id,'note',{text:'concurrent'});
+  let raced = false;
+  a.client.fetcher = async (url,options) => {
+    if (options.method === 'POST' && !raced) {raced = true; await b.client.run();}
+    return host.fetcher(url,options);
+  };
+  await a.client.run(); await b.client.run();
+  assert(raced);
+  assert(a.state.records.every(r => !r.dirty));
+  assert.deepEqual(new Set(b.state.records.map(r => r.payload.text)),new Set(['local','concurrent']));
+});
+test('edits made during an outstanding write are sent before sync completes',async () => {
+  const host = server(), key = newKey(), a = device(host,key), b = device(host,key);
+  const note = editRecord(a.state,null,'note',{text:'first'});
+  let edited = false;
+  a.client.fetcher = async (url,options) => {
+    const response = await host.fetcher(url,options);
+    if (options.method === 'POST' && !edited) {
+      edited = true; editRecord(a.state,note.id,'note',{text:'edited while waiting'});
+    }
+    return response;
+  };
+  await a.client.run(); await b.client.run();
+  assert(!note.dirty);
+  assert.equal(b.state.records[0].payload.text,'edited while waiting');
+});
 test('custom sync origins require HTTPS and never accept credential-bearing URLs',() => {
   const a = device(server(),newKey());
   for (const url of ['http://example.org','https://name:password@example.org','https://example.org/path','https://example.org?key=secret']) assert.throws(() => a.client.endpoint(url));
