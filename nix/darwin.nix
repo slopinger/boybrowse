@@ -87,12 +87,17 @@ in pkgs.stdenv.mkDerivation {
   configurePhase = ''
     runHook preConfigure
     export RUSTC_BOOTSTRAP=1
+    # Same node_modules fixes as nixpkgs' Chromium preConfigure: apply Chromium's npm patches and drop
+    # packages whose duplicate typings break the TypeScript steps (TS2403, TS2352).
+    (cd third_party/node && grep patch update_npm_deps | sh)
+    rm -r third_party/node/node_modules/@lit/reactive-element/development
+    rm -r third_party/node/node_modules/@types/estree
     # A silent GN hang once burned two hours of macOS CI. GN's piped output is block-buffered and lost
     # when it is killed, so run it on a pty (line-buffered, streams into the log) and, on a stall,
     # report the process tree and a stack sample before failing.
     # use_unified_system_module=false (as nixpkgs does for Linux): otherwise build/modules/BUILD.gn
     # expand_directory()s the whole Nix SDK sysroot recursively and gn spins at 100% CPU for hours.
-    python3 -c 'import pty, sys; sys.exit(pty.spawn(sys.argv[1:]) >> 8)' gn gen --verbose --time out/Release --args='is_debug=false is_official_build=false is_component_build=false symbol_level=0 blink_symbol_level=0 v8_symbol_level=0 target_cpu="arm64" target_os="mac" use_system_xcode=false is_chrome_branded=false chrome_pgo_phase=0 use_remoteexec=false use_siso=false enable_nacl=false enable_widevine=false use_typescript_go=false devtools_use_typescript_go=false treat_warnings_as_errors=false use_lld=true use_clang_modules=false use_unified_system_module=false' &
+    python3 -c 'import pty, sys; sys.exit(pty.spawn(sys.argv[1:]) >> 8)' gn gen --verbose --time out/Release --args='is_debug=false is_official_build=false is_component_build=false symbol_level=0 blink_symbol_level=0 v8_symbol_level=0 target_cpu="arm64" target_os="mac" use_system_xcode=false is_chrome_branded=false chrome_pgo_phase=0 use_remoteexec=false use_siso=false enable_nacl=false enable_widevine=false use_typescript_go=false devtools_use_typescript_go=false treat_warnings_as_errors=false use_lld=true use_clang_modules=false use_unified_system_module=false v8_use_metagen_instance_types=false' &
     gn_pid=$!
     for _ in $(seq 30); do
       sleep 10
