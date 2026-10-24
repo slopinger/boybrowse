@@ -35,6 +35,16 @@ in pkgs.stdenv.mkDerivation {
   buildInputs = [ sdk ];
   npmDeps = upstream.npmDeps;
   npmRoot = "third_party/node";
+  patches = [
+    # CL 7457194 references CIPD-only finch seeds that source tarballs lack; nixpkgs reverts it on Linux too.
+    (pkgs.fetchpatch {
+      name = "chromium-146-revert-Add-finch-seeds-to-desktop-perf-builds.patch";
+      url = "https://chromium.googlesource.com/chromium/src/+/d2e8a550eece6051372da94a475a8661da203106^!?format=TEXT";
+      decode = "base64 -d";
+      revert = true;
+      hash = "sha256-tJ//HE7o9R8nSQDGhi+MKXdNUwnkCZI++CzpAmFn2YY=";
+    })
+  ];
   unpackPhase = ''
     runHook preUnpack
     mkdir src
