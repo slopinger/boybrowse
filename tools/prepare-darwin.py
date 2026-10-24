@@ -51,3 +51,11 @@ xcode_version_int = 2660
 xcode_build = "nix-sdk-{version}"
 mac_sdk_logs = [ "mac_sdk_path={sdk}", "mac_sdk_version={version}" ]
 ''')
+# gpu_shader_cache.bin is a prebuilt Metal shader cache that Chromium's DEPS fetches from CIPD
+# (chromium/gpu/angle-metal-shader-libraries); source archives do not contain it, so do not bundle it.
+chrome_build = root / "chrome/BUILD.gn"
+bundled = '      "//ui/gl/resources/angle-metal/gpu_shader_cache.bin",\n'
+contents = chrome_build.read_text()
+if contents.count(bundled) != 1:
+    raise RuntimeError("Chromium Metal shader cache bundle context changed")
+chrome_build.write_text(contents.replace(bundled, ""))

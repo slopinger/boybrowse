@@ -39,6 +39,15 @@ class PatchTools(unittest.TestCase):
                 (root / path).mkdir(parents=True, exist_ok=True)
             (root / ".gn").write_text('script_executable = "//third_party/cpython3/host/bin/python3"\n')
             (root / "build/config/gclient_args.gni").write_text("checkout_mac = true\n")
+            (root / "chrome").mkdir()
+            chrome_build = root / "chrome/BUILD.gn"
+            chrome_build.write_text('''bundle_data("chrome_framework_resources") {
+  sources = [
+      "//ui/gl/resources/angle-metal/gpu_shader_cache.bin",
+      "app/theme/product_logo_32.png",
+  ]
+}
+''')
             sdk = root / "build/config/mac/mac_sdk.gni"
             sdk.write_text('''import("//build_overrides/build.gni")
 declare_args() {
@@ -68,6 +77,8 @@ host_sdk = exec_script("find_sdk.py", [], "scope")
             self.assertIn(sys.executable,(root / ".gn").read_text())
             self.assertNotIn("third_party/cpython3",(root / ".gn").read_text())
             self.assertIn(overlay.REVISION,(root / "build/util/LASTCHANGE").read_text())
+            self.assertNotIn("gpu_shader_cache.bin",chrome_build.read_text())
+            self.assertIn("product_logo_32.png",chrome_build.read_text())
 
     def test_every_python_tool_parses(self):
         for path in (ROOT / "tools").glob("*.py"):
