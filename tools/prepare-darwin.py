@@ -23,12 +23,16 @@ with (root / "build/config/gclient_args.gni").open("a") as file:
 # derivation supplies a complete, pinned SDK instead, so no host SDK is consulted.
 sdk = os.environ["BOYBROWSE_SDK"]
 version = os.environ["BOYBROWSE_SDK_VERSION"]
-(root / "build/config/mac/mac_sdk.gni").write_text(f'''
-import("//build/config/mac/mac_sdk_overrides.gni")
-declare_args() {{
-  mac_sdk_path = "{sdk}"
-  mac_sdk_name = "macosx"
-}}
+module = root / "build/config/mac/mac_sdk.gni"
+contents = module.read_text()
+marker = "# Check that the version of macOS SDK used is the one requested"
+if contents.count(marker) != 1:
+    raise RuntimeError("Chromium mac SDK module context changed")
+# Keep upstream imports and every declared build argument, including deployment
+# targets and build_overrides/build.gni's use_system_xcode declaration.
+preamble = contents.split(marker,1)[0]
+module.write_text(preamble + f'''
+mac_sdk_path = "{sdk}"
 mac_sdk_version = "{version}"
 mac_sdk_build_version = "nix"
 mac_sdk_official_version = mac_sdk_version

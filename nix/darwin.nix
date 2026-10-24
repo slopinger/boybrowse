@@ -53,7 +53,7 @@ in pkgs.stdenv.mkDerivation {
   configurePhase = ''
     runHook preConfigure
     export RUSTC_BOOTSTRAP=1
-    gn gen out/Release --args='is_debug=false is_official_build=false is_component_build=false symbol_level=0 blink_symbol_level=0 v8_symbol_level=0 target_cpu="arm64" target_os="mac" is_chrome_branded=false chrome_pgo_phase=0 use_remoteexec=false use_siso=false enable_nacl=false enable_widevine=false treat_warnings_as_errors=false use_lld=true'
+    gn gen out/Release --args='is_debug=false is_official_build=false is_component_build=false symbol_level=0 blink_symbol_level=0 v8_symbol_level=0 target_cpu="arm64" target_os="mac" use_system_xcode=false is_chrome_branded=false chrome_pgo_phase=0 use_remoteexec=false use_siso=false enable_nacl=false enable_widevine=false treat_warnings_as_errors=false use_lld=true'
     runHook postConfigure
   '';
   buildPhase = ''
