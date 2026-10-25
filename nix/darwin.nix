@@ -130,7 +130,8 @@ in pkgs.stdenv.mkDerivation {
     # Chromium's mac_deployment_target (13.0), which makes ld64.lld reject the Rust host tools' objects.
     export MACOSX_DEPLOYMENT_TARGET=13.0
     # Dawn's generator runs `go run`, which needs writable cache directories (HOME is not).
-    export GOCACHE="$TMPDIR/go-cache" GOPATH="$TMPDIR/go-path"    ninja -C out/Release -j$NIX_BUILD_CORES chrome
+    export GOCACHE="$TMPDIR/go-cache" GOPATH="$TMPDIR/go-path"
+    ninja -C out/Release -j$NIX_BUILD_CORES chrome
     runHook postBuild
   '';
   installPhase = ''
