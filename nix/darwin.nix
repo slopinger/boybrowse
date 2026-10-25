@@ -38,6 +38,8 @@ in pkgs.stdenv.mkDerivation {
   patches = [
     # Chromium pins an exact Node release; nixpkgs patches the check to a minimum version.
     "${nixpkgs}/pkgs/applications/networking/browsers/chromium/patches/chromium-136-nodejs-assert-minimal-version-instead-of-exact-match.patch"
+    # Dawn's source generator wants a CIPD Go binary under third_party/dawn/tools/golang; use Go from PATH.
+    "${nixpkgs}/pkgs/applications/networking/browsers/chromium/patches/chromium-151-dawn-use-Go-from-PATH.patch"
     # CL 7457194 references CIPD-only finch seeds that source tarballs lack; nixpkgs reverts it on Linux too.
     (pkgs.fetchpatch {
       name = "chromium-146-revert-Add-finch-seeds-to-desktop-perf-builds.patch";
@@ -127,7 +129,8 @@ in pkgs.stdenv.mkDerivation {
     # rustc takes its Mach-O minimum from this variable; the Nix SDK defaults it to a newer release than
     # Chromium's mac_deployment_target (13.0), which makes ld64.lld reject the Rust host tools' objects.
     export MACOSX_DEPLOYMENT_TARGET=13.0
-    ninja -C out/Release -j$NIX_BUILD_CORES chrome
+    # Dawn's generator runs `go run`, which needs writable cache directories (HOME is not).
+    export GOCACHE="$TMPDIR/go-cache" GOPATH="$TMPDIR/go-path"    ninja -C out/Release -j$NIX_BUILD_CORES chrome
     runHook postBuild
   '';
   installPhase = ''
