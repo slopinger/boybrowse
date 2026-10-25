@@ -73,6 +73,10 @@ in pkgs.stdenv.mkDerivation {
     mkdir -p third_party/llvm-build/Release+Asserts/bin
     ln -sf ${pkgs.gperf}/bin/gperf third_party/llvm-build/Release+Asserts/bin/gperf
     ln -sf ${pkgs.cctools}/bin/libtool third_party/llvm-build/Release+Asserts/bin/libtool
+    # The Chromium Clang tarball omits llvm-nm and llvm-otool, which linker_driver.py runs to build .TOC files.
+    test -x ${lib.getBin pkgs.llvm}/bin/llvm-nm && test -x ${lib.getBin pkgs.llvm}/bin/llvm-otool
+    ln -sf ${lib.getBin pkgs.llvm}/bin/llvm-nm third_party/llvm-build/Release+Asserts/bin/llvm-nm
+    ln -sf ${lib.getBin pkgs.llvm}/bin/llvm-otool third_party/llvm-build/Release+Asserts/bin/llvm-otool
     # Crashpad's mig.py runs bin/mig with libexec/migcom next to it (Apple's bootstrap_cmds).
     test -x ${pkgs.darwin.bootstrap_cmds}/bin/mig && test -x ${pkgs.darwin.bootstrap_cmds}/libexec/migcom
     mkdir -p third_party/llvm-build/Release+Asserts/libexec
