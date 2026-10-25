@@ -59,6 +59,17 @@ contents = chrome_build.read_text()
 if contents.count(bundled) != 1:
     raise RuntimeError("Chromium Metal shader cache bundle context changed")
 chrome_build.write_text(contents.replace(bundled, ""))
+# nixpkgs removes resolv.h and iconv.h from the SDK and ships them as separate packages. Chromium's
+# clang does not read nixpkgs' wrapper flags, so add them beside -isysroot. They must be -isystem:
+# CPATH and -I make Chromium's raw_ptr plugin check these headers and fail the build.
+mac_config = root / "build/config/mac/BUILD.gn"
+runtime_flags = "  cflags = common_flags\n"
+contents = mac_config.read_text()
+if contents.count(runtime_flags) != 1:
+    raise RuntimeError("Chromium Mac runtime_library context changed")
+includes = [path for path in os.environ["BOYBROWSE_SYSTEM_INCLUDES"].split(":") if path]
+extra = "".join(f'    "-isystem",\n    "{path}",\n' for path in includes)
+mac_config.write_text(contents.replace(runtime_flags, f"  cflags = common_flags + [\n{extra}  ]\n"))
 # ANGLE precompiles its internal Metal shaders with Apple's `metal` tool, which Xcode 26 ships as a
 # separate downloadable toolchain that the Nix SDK lacks. ANGLE's supported alternative is compiling the
 # embedded shader sources when the backend starts, so disable the build-time step.

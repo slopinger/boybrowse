@@ -55,6 +55,12 @@ class PatchTools(unittest.TestCase):
     angle_has_build &&
     (angle_metal_toolchain_dir != "" || (!is_ios && target_os == host_os))
 ''')
+            mac_build = root / "build/config/mac/BUILD.gn"
+            mac_build.write_text('''config("runtime_library") {
+  cflags = common_flags
+  ldflags = common_flags
+}
+''')
             sdk = root / "build/config/mac/mac_sdk.gni"
             sdk.write_text('''import("//build_overrides/build.gni")
 declare_args() {
@@ -74,7 +80,8 @@ host_sdk = exec_script("find_sdk.py", [], "scope")
             metadata = root / "info.json"
             metadata.write_text(json.dumps(info))
             subprocess.run([sys.executable, str(ROOT / "tools/prepare-darwin.py"),str(metadata)],
-                cwd=root,env={**os.environ,"BOYBROWSE_SDK":"/nix/store/test-sdk","BOYBROWSE_SDK_VERSION":"26.5"},check=True)
+                cwd=root,env={**os.environ,"BOYBROWSE_SDK":"/nix/store/test-sdk","BOYBROWSE_SDK_VERSION":"26.5",
+                "BOYBROWSE_SYSTEM_INCLUDES":"/nix/store/test-resolv/include:/nix/store/test-iconv/include"},check=True)
             text = sdk.read_text()
             self.assertIn('import("//build_overrides/build.gni")',text)
             self.assertIn('mac_deployment_target = "13.0"',text)
@@ -86,6 +93,8 @@ host_sdk = exec_script("find_sdk.py", [], "scope")
             self.assertIn(overlay.REVISION,(root / "build/util/LASTCHANGE").read_text())
             self.assertNotIn("gpu_shader_cache.bin",chrome_build.read_text())
             self.assertIn("product_logo_32.png",chrome_build.read_text())
+            self.assertIn('"-isystem",\n    "/nix/store/test-resolv/include",',mac_build.read_text())
+            self.assertIn("ldflags = common_flags",mac_build.read_text())
             self.assertEqual("metal_internal_shader_compilation_supported = false\n",metal_gni.read_text())
 
     def test_every_python_tool_parses(self):
