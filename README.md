@@ -43,7 +43,8 @@ nix develop                      # pinned Perl, Node, Python, git
 ```
 
 Supported build targets: `x86_64-linux`, `aarch64-linux`, `aarch64-darwin`.
-macOS builds run through Nix on GitHub Actions; the SDK and Chromium toolchain archives
+The macOS build runs through Nix on GitHub Actions by manual dispatch only (see the
+build matrix); the SDK and Chromium toolchain archives
 are pinned inputs. Windows builds are excluded. Chromium's extensive source
 dependencies are fixed-output inputs; compilation has no network access. macOS
 artifacts are unsigned development Nix closures; signing and notarization are
@@ -65,7 +66,7 @@ time. Do not mistake cached upstream Chromium for a completed Boybrowse build.
 | Dashboard layout | Desktop preview visually inspected; native runtime validation pending |
 | Linux source browser | Build in progress; no working binary claimed |
 | Linux ARM64 browser | Hydra build pending |
-| macOS ARM64 browser | Nix expression evaluates; native build/launch validation pending |
+| macOS ARM64 browser | Parked. The Nix build compiles past configuration and the tool/SDK fixes (14,845+ of 57,560 steps), but a standard GitHub macOS runner cannot finish within the 6 h job limit (run 40160212410 was cancelled at the limit). The CI job runs only by manual dispatch; no binary exists and nothing is launch-validated |
 
 Workspaces currently save and reopen collections rather than hiding live tabs by
 workspace. Chromium's existing settings/history/downloads pages retain their

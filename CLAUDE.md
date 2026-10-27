@@ -54,6 +54,13 @@ Linux architectures: x86_64 and aarch64. macOS target: aarch64. No Windows build
 - Darwin reuses common fixed-source DEPS, with Nix-native Python, Node, TypeScript,
   gperf and a version-matched esbuild (0.28.2). Keep upstream SDK argument declarations
   while replacing host SDK discovery. Never execute Linux CIPD helpers on macOS.
+- macOS CI is parked (manual dispatch only): the full build does not fit GitHub's 6 h limit on a
+  standard runner. The overlay fixes found so far, all in nix/darwin.nix and tools/prepare-darwin.py:
+  use_unified_system_module=false (gn hang), MACOSX_DEPLOYMENT_TARGET=13.0, mig/migcom, gperf, libtool,
+  llvm-nm/llvm-otool links in the LLVM bin dir, nixpkgs' Node minimal-version and Dawn Go-from-PATH
+  patches, no CIPD-only Metal shader cache, ANGLE Metal shaders compiled at runtime (no `metal` tool),
+  and -isystem for libresolv/libiconv (nixpkgs strips them from the SDK). Expect more tool gaps beyond
+  ninja step ~14,800; ninja output only shows in the log when a step fails.
 - Darwin HTTP tests require __darwinAllowLocalNetworking; this allows only local
   test sockets rather than disabling the Nix sandbox.
 - Deploy the Perl server only through nixfiles after its tests pass; bind 127.0.0.1:8792.

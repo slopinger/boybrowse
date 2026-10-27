@@ -24,6 +24,9 @@ jobs:
         run: nix build .#checks.x86_64-linux.server .#checks.x86_64-linux.javascript .#checks.x86_64-linux.integration .#checks.x86_64-linux.tooling -L --no-link
   macos:
     name: macOS ARM64 source build
+    # Parked: the full Chromium build exceeds GitHub's 6 h job limit on a standard runner
+    # (run 40160212410 was cancelled at the limit), so run it manually on a suitable runner.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-26
     timeout-minutes: 355
     steps:
